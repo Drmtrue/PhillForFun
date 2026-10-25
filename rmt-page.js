@@ -1,9 +1,9 @@
 // The "Биржа РМТ" section: overview cards, charts, order book, season timelines, the savings goal with a
 // farming-rate calculator, and the method notes. renderRmt(root, rows, meta) rebuilds it from /prices data.
 
-import { SEASONS, RMT_GOAL, RMT_MODEL } from "./config.js?v=202610251542";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251542";
-import { lineChart } from "./charts.js?v=202610251542";
+import { SEASONS, RMT_GOAL, RMT_MODEL } from "./config.js?v=202610251543";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251543";
+import { lineChart } from "./charts.js?v=202610251543";
 
 const COLORS = { poe1: "#cc8208", poe2: "#3b8fe8" };   // validated categorical pair on the dark surface
 const DAY = 86400000;
@@ -155,8 +155,9 @@ function charts(games, store) {
     const since = games.map((g) => g.ticks?.[0]?.[0]).filter(Boolean);
     const empty = `Почасовые данные копятся с ${since.length ? dateTxt(Math.min(...since)) : "сегодняшнего дня"} — график заполнится в ближайшие часы.`;
     const xTicks = days <= 1 ? 6 : days;  // one label per day on multi-day ranges
-    lineChart(priceBox, { series: tickSeries(1), xFmt: xf, xTicks, tipX: hourTxt, yFmt: (v) => rub(v), height: 230, empty, label: "Минимальная цена Divine по часам" });
-    lineChart(sellersBox, { series: tickSeries(2), xFmt: xf, xTicks, tipX: hourTxt, yFmt: (v) => int(v), height: 180, empty, label: "Продавцов онлайн по часам" });
+    const span = { xMin: from, xMax: Date.now(), xTicks };   // always show the whole chosen period
+    lineChart(priceBox, { series: tickSeries(1), xFmt: xf, ...span, tipX: hourTxt, yFmt: (v) => rub(v), height: 230, empty, label: "Минимальная цена Divine по часам" });
+    lineChart(sellersBox, { series: tickSeries(2), xFmt: xf, ...span, tipX: hourTxt, yFmt: (v) => int(v), height: 180, empty, label: "Продавцов онлайн по часам" });
   }
   for (const [id, label] of RANGES) {
     const b = h("button", id === range ? "active" : "", label);
@@ -170,6 +171,10 @@ function charts(games, store) {
     seg.append(b);
   }
 
+  const first = Math.min(...games.map((g) => g.ticks?.[0]?.[0] || Infinity));
+  if (Number.isFinite(first) && Date.now() - first < 14 * DAY) {
+    wrap.append(h("p", "muted small rmt-collecting", `Почасовые данные собираются с ${hourTxt(first)} — графики будут заполняться со временем.`));
+  }
   const head = h("div", "rmt-chart-head");
   head.append(h("h3", "", "Минимальная цена за 1 Divine"), seg);
   wrap.append(head, priceBox);
