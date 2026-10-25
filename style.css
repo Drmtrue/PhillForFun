@@ -16,6 +16,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* layout rules (grid/flex) must not override the hidden attribute */
 html, body { margin: 0; }
 
 body {

@@ -16,7 +16,7 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 | Side-court mini-game | `hoop.js` | Drag-and-throw basketball in the free space beside the quiz (wide screens only) |
 | Free throw | `freethrow.js` | Second-chance shot after a wrong answer (all screen sizes) |
 | Server | `worker/` | Cloudflare Worker: takes facts, generates and moderates questions with Root AI - model b1t quiz v1.1, stores questions and scores |
-| Admin | `admin.html` | Review and delete player-generated questions, browse submitted facts |
+| Admin | `admin.html` | Review, edit and delete player-generated questions (🔄 regenerate or ✏️ edit any answer), browse submitted facts |
 
 If `API_URL` in `config.js` is empty, the site runs in local mode: built-in questions only, and the leaderboard is stored in the browser.
 
@@ -54,6 +54,8 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | `POST` | `/facts` | Submit a fact `{ fact, author }` → generated questions or a rejection reason |
 | `GET` | `/admin/questions`, `/admin/facts` | Admin lists (`Authorization: Bearer <ADMIN_TOKEN>`) |
 | `DELETE` | `/admin/questions/:id` | Remove a question from the game |
+| `PATCH` | `/admin/questions/:id` | Edit the question text or answers `{ q?, correct?, wrong? }` (answers must stay distinct) |
+| `POST` | `/admin/questions/:id/regenerate` | Root AI rewrites one answer `{ slot: "correct" \| 0 \| 1 \| 2 }` and saves it |
 
 ## Adding built-in questions
 

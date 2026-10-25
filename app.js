@@ -1,6 +1,6 @@
-import { QUIZ, API_URL } from "./config.js?v=202610251313";
-import { initHoop } from "./hoop.js?v=202610251313";
-import { freeThrow } from "./freethrow.js?v=202610251313";
+import { QUIZ, API_URL } from "./config.js?v=202610251328";
+import { initHoop } from "./hoop.js?v=202610251328";
+import { freeThrow } from "./freethrow.js?v=202610251328";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";

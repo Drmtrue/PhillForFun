@@ -1,10 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
-import { generateQuestions } from "./generate.js";
+import { generateQuestions, regenerateAnswer } from "./generate.js";
 import { fetchDivinePrices } from "./prices.js";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400"
 };
@@ -140,6 +140,41 @@ export default {
           await store.deleteQuestion(Number(m[1]));
           return json({ ok: true });
         }
+
+        // Manual edit of the question text or any answer
+        if (m && request.method === "PATCH") {
+          const id = Number(m[1]);
+          const cur = await store.getQuestion(id);
+          if (!cur) return json({ error: "Вопрос не найден" }, 404);
+          const body = await request.json().catch(() => ({}));
+          const next = {
+            q: body.q !== undefined ? clean(body.q, 200) : cur.q,
+            correct: body.correct !== undefined ? clean(body.correct, 100) : cur.correct,
+            wrong: Array.isArray(body.wrong) ? body.wrong.map((w) => clean(w, 100)) : cur.wrong
+          };
+          const all = [next.correct, ...next.wrong];
+          if (!next.q || next.wrong.length !== 3 || all.some((x) => !x)) return json({ error: "Пустые поля не допускаются" }, 400);
+          if (new Set(all.map((x) => x.toLowerCase())).size !== 4) return json({ error: "Ответы должны различаться" }, 400);
+          return json({ question: await store.updateQuestion(id, next) });
+        }
+
+        // Ask Root AI for a replacement of one answer: { slot: "correct" | 0 | 1 | 2 }
+        const rg = path.match(/^\/admin\/questions\/(\d+)\/regenerate$/);
+        if (rg && request.method === "POST") {
+          if (!(env.AI_API_KEY || env.ANTHROPIC_API_KEY)) return json({ error: "Генерация не настроена" }, 503);
+          const id = Number(rg[1]);
+          const cur = await store.getQuestion(id);
+          if (!cur) return json({ error: "Вопрос не найден" }, 404);
+          const body = await request.json().catch(() => ({}));
+          const slot = body.slot === "correct" ? "correct" : Number(body.slot);
+          if (slot !== "correct" && ![0, 1, 2].includes(slot)) return json({ error: "Неизвестный ответ" }, 400);
+          let text;
+          try { text = await regenerateAnswer(env, cur, slot, cur.fact); }
+          catch (e) { console.error(e); return json({ error: "Root AI не справился, попробуй ещё раз" }, 502); }
+          const next = { q: cur.q, correct: cur.correct, wrong: [...cur.wrong] };
+          if (slot === "correct") next.correct = text; else next.wrong[slot] = text;
+          return json({ question: await store.updateQuestion(id, next) });
+        }
       }
 
       if (path === "/") return json({ ok: true, name: "Трансформация Безработного API" });
@@ -263,6 +298,21 @@ export class QuizStore extends DurableObject {
 
   listFacts() {
     return this.sql.exec("SELECT id, text, author, status, reason, created_at FROM facts ORDER BY id DESC LIMIT 300").toArray();
+  }
+
+  getQuestion(id) {
+    const r = this.sql.exec(`
+      SELECT q.id, q.author, q.q, q.correct, q.wrong, q.created_at, f.text AS fact
+      FROM questions q LEFT JOIN facts f ON f.id = q.fact_id
+      WHERE q.id = ? AND q.deleted = 0
+    `, id).toArray()[0];
+    if (!r) return null;
+    return { id: r.id, author: r.author, q: r.q, correct: r.correct, wrong: JSON.parse(r.wrong), fact: r.fact, createdAt: r.created_at };
+  }
+
+  updateQuestion(id, { q, correct, wrong }) {
+    this.sql.exec("UPDATE questions SET q = ?, correct = ?, wrong = ? WHERE id = ?", q, correct, JSON.stringify(wrong), id);
+    return this.getQuestion(id);
   }
 
   deleteQuestion(id) {

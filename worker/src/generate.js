@@ -51,6 +51,74 @@ const TOOL = {
 
 const cut = (s, n) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 
+// One AI call that returns the tool input (or JSON parsed from text as a fallback)
+async function callAI(env, { system, tool, user, maxTokens = 1500 }) {
+  const base = env.AI_BASE_URL || "https://api.anthropic.com";
+  const res = await fetch(`${base}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": env.AI_API_KEY || env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: env.MODEL || "claude-sonnet-5-5",
+      max_tokens: maxTokens,
+      system,
+      tools: [tool],
+      tool_choice: { type: "auto" },
+      messages: [{ role: "user", content: user }]
+    })
+  });
+  if (!res.ok) {
+    console.error("AI API error", res.status, await res.text());
+    throw new Error("generation failed");
+  }
+  const data = await res.json();
+  let out = (data.content || []).find((c) => c.type === "tool_use")?.input;
+  if (!out) {
+    const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
+    const m = text.match(/\{[\s\S]*\}/);
+    try { out = m ? JSON.parse(m[0]) : null; } catch (_) { out = null; }
+  }
+  if (!out) throw new Error("no tool output");
+  return out;
+}
+
+const ANSWER_SYSTEM = `You edit one answer option in a Russian-language party quiz «Трансформация Безработного» about a real guy named Фил (Phil), who asked for this quiz and is fine with friendly roasting.
+
+Lore: smokes for an extremely long time; plays Path of Exile (POE); lives off RMT (selling game items for real money); hates working, longest job ever lasted about a month; adores adjika; catchphrase «Где я в этой схеме?»; loves basketball, favorite player Michael Jordan (#23), old nickname x23x; loves video games, smoking and long baths.
+
+You get a question, all four current answers and which one to replace.
+- If the target is the CORRECT answer: rewrite it with the same meaning (it must stay true according to the fact), in fresh wording, similar length and style to the other options so it does not stand out.
+- If the target is a WRONG answer: invent a new funny, absurd but in-universe wrong answer that is clearly false, different from all other options, playing on the lore.
+Natural colloquial Russian, no swearing, at most 70 characters. Respond by calling the "answer" tool with only the new text.`;
+
+const ANSWER_TOOL = {
+  name: "answer",
+  description: "Return the replacement answer text.",
+  input_schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] }
+};
+
+// slot: "correct" or 0..2 (index into wrong answers)
+export async function regenerateAnswer(env, question, slot, fact) {
+  const isCorrect = slot === "correct";
+  const target = isCorrect ? question.correct : question.wrong[slot];
+  const user = [
+    fact ? `Fact this question is based on: <fact>${fact}</fact>` : "Fact: (not available)",
+    `Question: ${question.q}`,
+    `Correct answer: ${question.correct}`,
+    ...question.wrong.map((w, i) => `Wrong answer ${i + 1}: ${w}`),
+    "",
+    `Replace this ${isCorrect ? "CORRECT" : "WRONG"} answer: «${target}»`
+  ].join("\n");
+  const out = await callAI(env, { system: ANSWER_SYSTEM, tool: ANSWER_TOOL, user, maxTokens: 300 });
+  const text = cut(String(out.text || "").replace(/^[«"]|[»"]$/g, ""), 100);
+  const others = [question.correct, ...question.wrong].filter((x) => x !== target).map((x) => x.toLowerCase());
+  if (!text || others.includes(text.toLowerCase())) throw new Error("bad answer");
+  return text;
+}
+
 export async function generateQuestions(env, fact, context) {
   const userMsg = [
     "Facts already in the quiz:",

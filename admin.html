@@ -5,18 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Админка квиза</title>
-  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610251313">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=202610251328">
   <style>
     .item { border-top: 1px solid var(--line); padding: 14px 0; }
     .item:first-child { border-top: 0; }
     .item .q { font-weight: 700; margin: 0 0 6px; }
     .item .meta { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
-    .item ul { margin: 4px 0 0; padding-left: 18px; }
-    .item li.ok { color: var(--green); }
     .item .btn { padding: 8px 14px; font-size: 14px; margin-top: 8px; }
-    .tabs { display: flex; gap: 8px; margin: 16px 0; }
-    .tabs .btn.on { border-color: var(--gold); color: var(--gold); }
+    .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+    .tabs .btn.on { border-color: var(--led); color: var(--led); }
+    body { -webkit-user-select: text; user-select: text; }
+
+    /* Editable rows: question text and each answer */
+    .row-edit { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+    .row-edit + .row-edit { border-top: 1px dashed var(--line); }
+    .row-edit .mark { flex: none; width: 22px; text-align: center; font-weight: 800; }
+    .row-edit .txt { flex: 1; min-width: 0; }
+    .row-edit.correct .mark, .row-edit.correct .txt { color: var(--green); }
+    .row-edit.wrong .mark { color: var(--red-2); }
+    .row-edit.question .txt { font-weight: 700; }
+    .row-edit input { flex: 1; min-width: 0; padding: 8px 10px; font-size: 15px; border-radius: 10px; }
+    .icon-btn {
+      flex: none; width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 15px;
+      display: grid; place-items: center; transition: border-color .15s, opacity .15s;
+    }
+    .icon-btn:hover { border-color: var(--led); }
+    .icon-btn:disabled { opacity: .5; cursor: wait; }
+    .row-edit.busy .txt { opacity: .5; }
+    .row-edit.flash { animation: flash 1s ease; }
+    @keyframes flash { 0% { background: rgba(255,176,32,.25); } 100% { background: transparent; } }
+    .answers-box { margin: 6px 0 0; }
+    .row-err { color: var(--red-2); font-size: 13px; margin: 4px 0 0; }
     .fact.rejected { opacity: .7; }
     .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); margin-right: 6px; }
     .tag.accepted { color: var(--green); border-color: var(--green); }
@@ -46,7 +67,7 @@
   </main>
 
   <script type="module">
-    import { API_URL } from "./config.js?v=202610251313";
+    import { API_URL } from "./config.js?v=202610251328";
     const API = API_URL.replace(/\/+$/, "");
     const $ = (id) => document.getElementById(id);
     let token = "";
@@ -54,7 +75,7 @@
     let tab = "questions";
 
     async function api(path, opts = {}) {
-      const res = await fetch(API + path, { ...opts, headers: { Authorization: "Bearer " + token } });
+      const res = await fetch(API + path, { ...opts, headers: { Authorization: "Bearer " + token, ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Ошибка");
       return data;
@@ -68,6 +89,86 @@
     };
     const when = (ms) => new Date(ms).toLocaleString("ru-RU");
 
+    // ---- Question editor: every row has "regenerate" (answers only) and "edit" buttons
+    function renderQuestion(box, q) {
+      box.innerHTML = "";
+      box.append(row(box, q, "q", "?", q.q, false));
+      box.append(row(box, q, "correct", "✓", q.correct, true));
+      q.wrong.forEach((w, i) => box.append(row(box, q, i, "✗", w, true)));
+    }
+
+    function row(box, q, slot, mark, text, canRegen) {
+      const kind = slot === "q" ? "question" : slot === "correct" ? "correct" : "wrong";
+      const r = el("div", "row-edit " + kind);
+      r.append(el("span", "mark", mark), el("span", "txt", text));
+      if (canRegen) {
+        const regen = el("button", "icon-btn", "🔄");
+        regen.type = "button";
+        regen.title = slot === "correct" ? "Перефразировать правильный ответ (Root AI)" : "Придумать новый неправильный ответ (Root AI)";
+        regen.onclick = async () => {
+          r.classList.add("busy");
+          r.querySelectorAll("button").forEach((b) => (b.disabled = true));
+          try {
+            const { question } = await api(`/admin/questions/${q.id}/regenerate`, { method: "POST", body: JSON.stringify({ slot }) });
+            Object.assign(q, question);
+            renderQuestion(box, q);
+            box.children[slot === "correct" ? 1 : slot + 2]?.classList.add("flash");
+          } catch (e) {
+            r.classList.remove("busy");
+            r.querySelectorAll("button").forEach((b) => (b.disabled = false));
+            showError(r, e.message);
+          }
+        };
+        r.append(regen);
+      }
+      const edit = el("button", "icon-btn", "✏️");
+      edit.type = "button";
+      edit.title = "Изменить вручную";
+      edit.onclick = () => startEdit(box, q, slot, r, text);
+      r.append(edit);
+      return r;
+    }
+
+    function startEdit(box, q, slot, r, text) {
+      r.innerHTML = "";
+      const input = el("input");
+      input.value = text;
+      input.maxLength = slot === "q" ? 200 : 100;
+      const save = el("button", "icon-btn", "💾");
+      const cancel = el("button", "icon-btn", "✖");
+      save.type = cancel.type = "button";
+      save.title = "Сохранить";
+      cancel.title = "Отмена";
+      r.append(el("span", "mark", slot === "q" ? "?" : slot === "correct" ? "✓" : "✗"), input, save, cancel);
+      input.focus();
+      input.select();
+      const doSave = async () => {
+        const value = input.value.trim();
+        if (!value) return showError(r, "Пустым оставить нельзя");
+        const body = slot === "q" ? { q: value } : slot === "correct" ? { correct: value } : { wrong: q.wrong.map((w, i) => (i === slot ? value : w)) };
+        save.disabled = cancel.disabled = true;
+        try {
+          const { question } = await api(`/admin/questions/${q.id}`, { method: "PATCH", body: JSON.stringify(body) });
+          Object.assign(q, question);
+          renderQuestion(box, q);
+        } catch (e) {
+          save.disabled = cancel.disabled = false;
+          showError(r, e.message);
+        }
+      };
+      save.onclick = doSave;
+      cancel.onclick = () => renderQuestion(box, q);
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") doSave();
+        if (e.key === "Escape") renderQuestion(box, q);
+      };
+    }
+
+    function showError(r, msg) {
+      r.parentElement.querySelectorAll(".row-err").forEach((x) => x.remove());
+      r.after(el("p", "row-err", msg));
+    }
+
     async function render() {
       const list = $("list");
       list.innerHTML = "";
@@ -78,11 +179,9 @@
           if (!questions.length) list.append(el("p", "muted", "Пока нет вопросов от игроков."));
           for (const q of questions) {
             const item = el("div", "item");
-            item.append(el("p", "q", q.q));
-            const ul = el("ul");
-            ul.append(el("li", "ok", "✓ " + q.correct));
-            q.wrong.forEach((w) => ul.append(el("li", "", w)));
-            item.append(ul);
+            const box = el("div", "answers-box");
+            item.append(box);
+            renderQuestion(box, q);
             item.append(el("p", "meta", `Факт от ${q.author}: «${q.fact || "—"}» · ${when(q.createdAt)}`));
             const del = el("button", "btn", "Удалить");
             del.onclick = async () => {
