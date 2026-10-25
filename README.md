@@ -79,7 +79,7 @@ Defined in `achievements.js` (`id`, `icon`, `title`, `desc`, optional `secret` +
 
 ## Side-court mini-game
 
-On screens wider than ~1100px a hoop appears in the empty space left or right of the quiz. The ball lies at the bottom of the viewport; drag it with the mouse (or finger) and release to throw. A basket adds one point to a separate counter (top-left HUD, leaderboard 🏀), and the hoop moves to a new random spot after every throw. Releasing the ball above the rim is a dunk and does not count. Add `?debug` to the URL to expose `window.__hoop` for automated checks.
+On screens wider than ~1100px a hoop appears in the empty space left or right of the quiz. The ball lies at the bottom of the viewport; drag it with the mouse (or finger) and release to throw. A basket adds one point to a separate counter (top-left HUD, leaderboard 🏀), and after every throw the hoop jumps to a random side and height, always with its backboard flush against that edge of the screen. Releasing the ball above the rim is a dunk and does not count. Add `?debug` to the URL to expose `window.__hoop` for automated checks.
 
 ## RMT exchange widget
 

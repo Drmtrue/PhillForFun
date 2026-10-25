@@ -1,4 +1,4 @@
-import { spinDetector, drawFace } from "./ballskin.js?v=202610251504";
+import { spinDetector, drawFace } from "./ballskin.js?v=202610251508";
 
 // Side-court mini-game: a hoop appears in the empty space left or right of the quiz column,
 // the ball lies at the bottom of the viewport, and the player drags and flings it into the hoop.
@@ -53,13 +53,12 @@ export function initHoop({ onBasket, onMiss, onDunk, onNpcBasket, onNpcMiss, sou
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   function placeHoop() {
+    // Random side and height; the backboard is always flush with that edge of the screen
     const side = Math.random() < 0.5 ? "left" : "right";
-    const [z0, z1] = zones[side];
-    const margin = 34;
-    // Board sits on the outer side, rim opens toward the page center
-    const x = side === "left" ? rand(z0 + margin + 14, z1 - RIM_W - margin) : rand(z0 + margin, z1 - RIM_W - margin - 14);
+    const BOARD_W = 7;
+    const boardX = side === "left" ? BOARD_W : vw - BOARD_W;
+    const x = side === "left" ? boardX + 12 : boardX - 12 - RIM_W;
     const y = rand(vh * 0.18, vh * 0.55);
-    const boardX = side === "left" ? x - 12 : x + RIM_W + 12;
     hoop = { side, x, y, boardX, vw, vh, born: performance.now() };
   }
 
@@ -274,7 +273,7 @@ export function initHoop({ onBasket, onMiss, onDunk, onNpcBasket, onNpcMiss, sou
 
   function drawBoard() {
     const h = hoop;
-    const bx = h.boardX, w = 7;
+    const bx = h.boardX, w = 7; // board width (matches BOARD_W in placeHoop)
     g.fillStyle = "rgba(245, 239, 233, .92)";
     g.fillRect(h.side === "left" ? bx - w : bx, h.y - 78, w, 94);
     // Bracket

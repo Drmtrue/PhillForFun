@@ -1,9 +1,9 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251504";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251504";
-import { initHoop } from "./hoop.js?v=202610251504";
-import { freeThrow } from "./freethrow.js?v=202610251504";
-import { onSkinChange } from "./ballskin.js?v=202610251504";
-import { initAvatar } from "./avatar.js?v=202610251504";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251508";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251508";
+import { initHoop } from "./hoop.js?v=202610251508";
+import { freeThrow } from "./freethrow.js?v=202610251508";
+import { onSkinChange } from "./ballskin.js?v=202610251508";
+import { initAvatar } from "./avatar.js?v=202610251508";
 
 const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 

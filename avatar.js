@@ -286,7 +286,7 @@ export function initAvatar() {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251504")
+  import("./phil3d.js?v=202610251508")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, { bubble, onClick: () => say("click", { force: true }) });
       root.classList.add("phil-3d");
