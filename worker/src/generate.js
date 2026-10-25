@@ -1,4 +1,4 @@
-// Превращает факт о Филе в смешные вопросы через Claude API.
+// Turns a fact about Phil into funny quiz questions via the Claude API.
 
 const SYSTEM = `You write questions for a Russian-language party quiz called «Трансформация Безработного» about a real guy named Фил (Phil). Friends play it to see who knows him best. Phil asked for this quiz himself and is fine with being roasted.
 
@@ -75,8 +75,8 @@ export async function generateQuestions(env, fact, context) {
       max_tokens: 1500,
       system: SYSTEM,
       tools: [TOOL],
-      // Некоторые модели не поддерживают принудительный вызов инструмента,
-      // поэтому "auto" + требование в промпте, а на всякий случай — разбор JSON из текста.
+      // Some models do not support forcing a specific tool, so we use "auto",
+      // ask for the tool in the prompt, and fall back to parsing JSON from text.
       tool_choice: { type: "auto" },
       messages: [{ role: "user", content: userMsg }]
     })
@@ -103,7 +103,7 @@ export async function generateQuestions(env, fact, context) {
     return { accepted: false, reason: cut(out.reason, 200) || "Этот факт не прошёл фейс-контроль." };
   }
 
-  // Проверяем, что вопросы корректные
+  // Validate the generated questions
   const questions = (out.questions || [])
     .map((x) => ({
       q: cut(x.q, 200),

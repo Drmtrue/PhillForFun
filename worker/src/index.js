@@ -26,12 +26,12 @@ export default {
     const ip = request.headers.get("CF-Connecting-IP") || "local";
 
     try {
-      // Сгенерированные вопросы для игры
+      // Generated questions for the game
       if (path === "/questions" && request.method === "GET") {
         return json({ questions: await store.listQuestions() });
       }
 
-      // Рейтинг
+      // Leaderboard
       if (path === "/scores" && request.method === "GET") {
         return json({ scores: await store.topScores(15) });
       }
@@ -51,7 +51,7 @@ export default {
         return json({ ok: true });
       }
 
-      // Новый факт → вопросы
+      // New fact -> questions
       if (path === "/facts" && request.method === "POST") {
         const body = await request.json().catch(() => ({}));
         const fact = clean(body.fact, 300);
@@ -79,7 +79,7 @@ export default {
         return json({ accepted: true, questions: saved });
       }
 
-      // Админка: список и удаление
+      // Admin: list and delete
       if (path.startsWith("/admin")) {
         const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
         if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) return json({ error: "Нет доступа" }, 401);
@@ -147,7 +147,7 @@ export class QuizStore extends DurableObject {
     for (const q of schema) this.sql.exec(q);
   }
 
-  // Простой лимит: не больше `limit` событий за `windowSec` секунд
+  // Simple rate limit: at most `limit` events per `windowSec` seconds
   allow(key, kind, limit, windowSec) {
     const now = Date.now();
     const since = now - windowSec * 1000;
@@ -213,7 +213,7 @@ export class QuizStore extends DurableObject {
     this.sql.exec("INSERT INTO scores (name, score, total, created_at) VALUES (?, ?, ?, ?)", name, score, total, Date.now());
   }
 
-  // Лучший результат каждого игрока (по проценту), при равенстве — кто раньше
+  // Best result per player (by percentage); ties go to whoever scored first
   topScores(limit) {
     const rows = this.sql.exec("SELECT name, score, total, created_at FROM scores ORDER BY id").toArray();
     const best = new Map();

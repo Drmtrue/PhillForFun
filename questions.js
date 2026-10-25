@@ -1,6 +1,7 @@
-// Пул вопросов. В каждой игре случайно выбираются 10 штук.
-// Формат: q — вопрос, correct — правильный ответ, wrong — ровно 3 неправильных.
-// Порядок ответов перемешивается автоматически, правильный можно всегда писать в correct.
+// Built-in question pool. Each game randomly picks 10 questions (built-in + generated).
+// Format: q = question, correct = right answer, wrong = exactly 3 wrong answers.
+// Answer order is shuffled automatically, so always put the right answer in `correct`.
+// Question text stays in Russian: it is player-facing content, not code.
 
 window.QUESTIONS = [
   {

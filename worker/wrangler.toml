@@ -4,7 +4,7 @@ compatibility_date = "2025-09-01"
 workers_dev = true
 preview_urls = false
 
-# Одна база на всё: факты, вопросы, рейтинг (SQLite внутри Durable Object, есть в бесплатном плане)
+# Single store for facts, questions and scores (SQLite-backed Durable Object, available on the free plan)
 [[durable_objects.bindings]]
 name = "STORE"
 class_name = "QuizStore"
@@ -18,9 +18,9 @@ MODEL = "claude-sonnet-5-5"
 FACTS_PER_HOUR_PER_IP = "20"
 FACTS_PER_DAY_TOTAL = "100"
 
-# Секреты задаются в панели Cloudflare (Settings → Variables and secrets), не здесь:
-#   ANTHROPIC_API_KEY — ключ из console.anthropic.com
-#   ADMIN_TOKEN       — любой длинный пароль для страницы admin.html
+# Secrets are set in the Cloudflare dashboard (Settings -> Variables and secrets), not here:
+#   ANTHROPIC_API_KEY - API key from console.anthropic.com
+#   ADMIN_TOKEN       - any long password for the admin.html page
 
 [observability]
 enabled = true

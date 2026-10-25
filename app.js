@@ -4,7 +4,7 @@ const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
 const LOCAL_KEY = "phill_quiz_scores";
 
-/* ---------- Cookie с именем ---------- */
+/* ---------- Player name cookie ---------- */
 function getName() {
   const m = document.cookie.match(new RegExp("(?:^|; )" + NAME_COOKIE + "=([^;]*)"));
   return m ? decodeURIComponent(m[1]) : "";
@@ -13,7 +13,7 @@ function setName(name) {
   document.cookie = `${NAME_COOKIE}=${encodeURIComponent(name)}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax`;
 }
 
-/* ---------- Сервер (Cloudflare) или локальный режим ---------- */
+/* ---------- Server (Cloudflare) or local mode ---------- */
 const API = API_URL.replace(/\/+$/, "");
 
 async function api(path, opts = {}) {
@@ -45,7 +45,7 @@ async function loadScores() {
   return readLocal();
 }
 
-// Вопросы: встроенные + сгенерированные по фактам
+// Questions: built-in + generated from player facts
 let generated = [];
 async function loadGenerated() {
   if (!API) return;
@@ -55,7 +55,7 @@ function questionPool() {
   return [...(window.QUESTIONS || []), ...generated];
 }
 
-// Лучший результат каждого игрока; при равенстве выше тот, кто набрал раньше
+// Best result per player; ties go to whoever scored first
 function bestPerPlayer(rows) {
   const best = new Map();
   for (const r of rows) {
@@ -96,7 +96,7 @@ async function renderBoard(el) {
   }
 }
 
-/* ---------- Игра ---------- */
+/* ---------- Game ---------- */
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -221,7 +221,7 @@ async function finish() {
   renderBoard($("board-result"));
 }
 
-/* ---------- События ---------- */
+/* ---------- Events ---------- */
 $("start-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = $("player-name").value.trim().slice(0, 30);
@@ -244,7 +244,7 @@ $("again-btn").addEventListener("click", async () => {
   startGame(game.name);
 });
 
-/* ---------- Добавление фактов ---------- */
+/* ---------- Adding facts ---------- */
 $("fact-text").addEventListener("input", () => {
   $("fact-count").textContent = `${$("fact-text").value.length}/300`;
 });
@@ -317,7 +317,7 @@ $("share-btn").addEventListener("click", async () => {
   } catch (_) {}
 });
 
-/* ---------- Запуск ---------- */
+/* ---------- Startup ---------- */
 $("player-name").value = getName();
 $("fact-block").hidden = !API;
 updateFoot();
