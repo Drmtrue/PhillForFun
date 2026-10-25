@@ -15,6 +15,8 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 | Achievements | `achievements.js` | Achievement catalogue (unlock logic and easter eggs live in `app.js`) |
 | Side-court mini-game | `hoop.js` | Drag-and-throw basketball in the free space beside the quiz (wide screens only) |
 | Free throw | `freethrow.js` | Second-chance shot after a wrong answer (all screen sizes) |
+| Ball skin | `ballskin.js`, `assets/phil-face.png` | Spin gesture that turns the ball into Phil's face (shared by both courts) |
+| Phil avatar | `avatar.js` | Anime-style Phil in the corner who comments on the game and takes smoke breaks |
 | Server | `worker/` | Cloudflare Worker: takes facts, generates and moderates questions with Root AI - model b1t quiz v1.1, stores questions and scores |
 | Admin | `admin.html` | Review, edit and delete player-generated questions (🔄 regenerate or ✏️ edit any answer), browse submitted facts |
 
@@ -110,3 +112,16 @@ After the first wrong answer to a question, the right answer stays hidden and a 
 - miss it (or press "Не бросать") → the right answer is revealed and the game moves on.
 
 Only one free throw per question. `freeThrow()` resolves to `{ made, skipped, stats }` (rim hits, backboard, highest point, odd throws), and live events (`forgot`, `nudge`, `wrongway`, `down`) fire while the modal is open. These drive 16 free-throw achievements: made / saved / choked, swish, bank shot, lucky rim roll, rim-out, airball, 3 made or 3 missed in one game, skipped, plus secret ones for forgetting to throw, throwing the wrong way, into the floor, off the screen, or too weakly.
+
+## Face ball
+
+Grab the ball (side court or free throw) and spin it fast — about two quick loops with the mouse or finger within 1.5 s. The ball turns into Phil's face (`assets/phil-face.png`, used with his consent) and spins along with the gesture. Spin fast again, or refresh the page, to get the normal ball back; the mode is kept in memory only. The detector (`spinDetector()` in `ballskin.js`) adds up the signed change of the pointer's heading over a sliding window, so zigzags cancel out and only real loops count. The first transformation unlocks the secret achievement «Голова кругом».
+
+## Phil avatar
+
+`avatar.js` draws an anime-style Phil (inline SVG: buzz cut, blue-grey eyes, stubble, a black #23 shirt) in the bottom-right corner, above every other layer including the free-throw modal. He reacts in a speech bubble to: game start, right/wrong answers, the free throw (start, made, missed, skipped), side-court baskets, misses and dunks, achievements, the face ball, going idle and the final score. Clicking him gives a random line.
+
+- Every event has several lines in `LINES`; one is picked at random and never the same twice in a row. Add lines there (a line can be `{ t, smoke: true }` to light up while saying it).
+- Expressions: neutral, happy, sad, shock, smug (switched via `data-mood`), plus blinking.
+- His signature move: every 35–80 s, and after some lines, he lights a cigarette — a hand with a lighter comes up, the flame flickers, the ember glows and smoke puffs drift away.
+- Important events always speak; minor ones (misses, achievements) are rate-limited so he does not talk over every click.

@@ -1,3 +1,5 @@
+import { spinDetector, drawFace } from "./ballskin.js?v=202610251437";
+
 // Side-court mini-game: a hoop appears in the empty space left or right of the quiz column,
 // the ball lies at the bottom of the viewport, and the player drags and flings it into the hoop.
 // Baskets are reported through onBasket(); counting and storage live in app.js.
@@ -24,6 +26,7 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
   const ball = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, state: "rest" }; // rest | drag | flight | reset
   let throwInfo = null;      // { scored, dunk, t0, settledAt }
   let trail = [];            // recent pointer samples while dragging
+  const spin = spinDetector(); // fast loops while holding the ball swap the skin
   let netWobble = 0;
   let pops = [];             // floating "+1" labels
   let last = performance.now();
@@ -61,8 +64,11 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
   }
 
   function restBall() {
-    const [z0, z1] = zones[hoop ? hoop.side : "left"];
-    ball.x = (z0 + z1) / 2 + rand(-20, 20);
+    const side = hoop ? hoop.side : "left";
+    const [z0, z1] = zones[side];
+    // Keep clear of the avatar in the bottom-right corner
+    const right = side === "right" ? Math.max(z0 + 2 * R + 40, z1 - 130) : z1;
+    ball.x = (z0 + right) / 2 + rand(-15, 15);
     ball.y = vh - FLOOR_PAD - R;
     ball.vx = ball.vy = 0;
     ball.state = "rest";
@@ -78,6 +84,8 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
     ball.state = "drag";
     ball.vx = ball.vy = 0;
     trail = [{ x: e.clientX, y: e.clientY, t: performance.now() }];
+    spin.reset();
+    spin.push(e.clientX, e.clientY);
     document.body.classList.add("hoop-grabbing");
     try { e.target.setPointerCapture?.(e.pointerId); } catch (_) {}
   }, { capture: true });
@@ -88,6 +96,7 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
       ball.y = Math.min(e.clientY, vh - FLOOR_PAD - R);
       trail.push({ x: e.clientX, y: e.clientY, t: performance.now() });
       if (trail.length > 8) trail.shift();
+      ball.angle += spin.push(e.clientX, e.clientY);
       return;
     }
     document.body.classList.toggle("hoop-hover", onBall(e.clientX, e.clientY));
@@ -202,6 +211,7 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
     g.save();
     g.translate(ball.x, ball.y);
     g.rotate(ball.angle);
+    if (drawFace(g, R)) { g.restore(); return; }
     const grad = g.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.1, 0, 0, R);
     grad.addColorStop(0, "#ffa057");
     grad.addColorStop(1, "#c4520f");

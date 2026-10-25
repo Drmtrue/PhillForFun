@@ -1,7 +1,11 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251426";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251426";
-import { initHoop } from "./hoop.js?v=202610251426";
-import { freeThrow } from "./freethrow.js?v=202610251426";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251437";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251437";
+import { initHoop } from "./hoop.js?v=202610251437";
+import { freeThrow } from "./freethrow.js?v=202610251437";
+import { onSkinChange } from "./ballskin.js?v=202610251437";
+import { initAvatar } from "./avatar.js?v=202610251437";
+
+const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -180,6 +184,7 @@ function unlock(id) {
   // Small delay so it does not clash with the answer sound
   // Easter egg handlers play their own sparkle, so the fanfare comes a bit later for those
   setTimeout(() => sfx.achievement(), a.secret ? 650 : 280);
+  setTimeout(() => phil.say("achievement"), 900);
   if (game && !game.done) game.newAch.push(id);
   else if (game && game.done) addNewAchToResult(id);
   const name = getName();
@@ -435,6 +440,7 @@ function startGame(name) {
   if (/^(фил|филипп|phil|phill|x23x)$/i.test(name.trim())) unlock("selfcheck");
   show("screen-quiz");
   renderQuestion();
+  phil.say("start", { force: true });
 }
 
 function renderQuestion() {
@@ -489,6 +495,7 @@ function pick(btn, text) {
   if (!right && cur.freeThrowMade) unlock("ft_choke");
 
   right ? sfx.swish() : sfx.brick();
+  if (right || !firstTry) phil.say(right ? "correct" : "wrong", { force: true });
   $("live-score").textContent = game.score;
   $("call").textContent = right ? pickOne(SWISH) : pickOne(BRICK);
   $("call").className = "call " + (right ? "swish" : "brick");
@@ -500,9 +507,12 @@ function pick(btn, text) {
     cur.busy = true;
     document.querySelectorAll(".answer").forEach((b) => (b.disabled = true));
     $("call").textContent = "Промах! На линию штрафного…";
+    phil.say("wrong", { force: true });
     setTimeout(async () => {
       const FT_LIVE = { forgot: "ft_forgot", nudge: "ft_nudge", wrongway: "ft_wrongway", down: "ft_floor" };
+      setTimeout(() => phil.say("ftStart", { force: true }), 1800);
       const res = await freeThrow({ sound: playCourtSound, onEvent: (name) => FT_LIVE[name] && unlock(FT_LIVE[name]) });
+      phil.say(res.skipped ? "ftSkip" : res.made ? "ftMade" : "ftMiss", { force: true });
       const made = res.made;
       const st = res.stats;
       cur.busy = false;
@@ -569,6 +579,7 @@ async function finish() {
   if (total === 10 && game.score === 10) unlock("perfect");
   if (game.score === 0) unlock("zero");
   if (game.score === 1) unlock("one");
+  phil.say(game.score === total ? "endPerfect" : game.score === 0 ? "endZero" : game.score >= total / 2 ? "endGood" : "endBad", { force: true });
   const lastScores = store.get(LAST_SCORE_KEY, {});
   const prev = lastScores[nameKey(game.name)];
   if (prev != null && prev <= 2 && game.score >= 8) unlock("comeback");
@@ -923,6 +934,7 @@ function bumpIdle() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     toast("💤 AFK", "Фил бы уже докурил. Хотя нет, не докурил бы.");
+    phil.say("idle", { force: true });
     unlock("afk");
   }, 120000);
 }
@@ -1182,6 +1194,7 @@ function scoredBasket() {
   void $("hoop-hud").offsetWidth;
   $("hoop-hud").classList.add("bump");
   sfx.swish();
+  phil.say("basket");
   if (API && name) {
     api("/baskets", { method: "POST", body: JSON.stringify({ name, add: 1 }) })
       .then((r) => { baskets = Math.max(baskets, r.baskets); store.set(basketKey(name), baskets); renderBaskets(); })
@@ -1201,10 +1214,18 @@ function playCourtSound(kind, power) {
 
 const hoopGame = initHoop({
   onBasket: scoredBasket,
-  onDunk: () => { sfx.brick(); unlock("dunk"); },
+  onMiss: () => phil.say("miss"),
+  onDunk: () => { sfx.brick(); unlock("dunk"); phil.say("dunk", { force: true }); },
   sound: playCourtSound
 });
 if (new URLSearchParams(location.search).has("debug")) window.__hoop = hoopGame; // for automated checks only
+
+// Spinning the held ball fast turns it into Phil's face (and back)
+onSkinChange((face) => {
+  sfx.egg();
+  if (face) unlock("faceball");
+  phil.say(face ? "faceOn" : "faceOff", { force: true });
+});
 
 /* ---------- Startup ---------- */
 $("player-name").value = getName();

@@ -1,3 +1,5 @@
+import { spinDetector, drawFace } from "./ballskin.js?v=202610251437";
+
 // Free throw after a wrong answer: a small court in a modal, one throw.
 // Resolves to { made, skipped, stats } where stats describe how the shot went (for achievements).
 // The ball can only be held behind the free-throw line, so the shot has to be a real throw (no dunks).
@@ -48,6 +50,7 @@ export function freeThrow({ sound, onEvent } = {}) {
 
     const ball = { x: W * (0.38 + Math.random() * 0.24), y: floor - R, vx: 0, vy: 0, angle: 0, state: "rest" };
     let trail = [];
+    const spin = spinDetector();
     let shot = null;          // { t0, scored, done }
     let netWobble = 0;
     let finished = false;
@@ -74,6 +77,8 @@ export function freeThrow({ sound, onEvent } = {}) {
       try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* keeps working without capture */ }
       ball.state = "drag";
       trail = [{ ...p, t: performance.now() }];
+      spin.reset();
+      spin.push(p.x, p.y);
       canvas.classList.add("grabbing");
     });
     canvas.addEventListener("pointermove", (e) => {
@@ -83,6 +88,7 @@ export function freeThrow({ sound, onEvent } = {}) {
         ball.y = Math.max(lineY + R, Math.min(floor - R, p.y)); // stay behind the line
         trail.push({ ...p, t: performance.now() });
         if (trail.length > 8) trail.shift();
+        ball.angle += spin.push(p.x, p.y);
       } else {
         canvas.classList.toggle("hover", ball.state === "rest" && Math.hypot(p.x - ball.x, p.y - ball.y) <= R + 14);
       }
@@ -195,6 +201,7 @@ export function freeThrow({ sound, onEvent } = {}) {
       g.save();
       g.translate(ball.x, ball.y);
       g.rotate(ball.angle);
+      if (drawFace(g, R)) { g.restore(); return; }
       const grad = g.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.1, 0, 0, R);
       grad.addColorStop(0, "#ffa057");
       grad.addColorStop(1, "#c4520f");

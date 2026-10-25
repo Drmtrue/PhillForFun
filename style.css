@@ -676,3 +676,56 @@ body.hoop-on .hoop-hud { display: block; }
 .goal-details[open] .goal-toggle .when-closed { display: none; }
 .goal-body { padding: 0 12px 12px; animation: fade .25s ease; }
 .rmt-row.rmt-stale .rmt-num { color: var(--muted); text-shadow: none; text-decoration: line-through; }
+
+/* ---------- Anime Phil avatar ---------- */
+.phil-av { position: fixed; right: 14px; bottom: 14px; z-index: 65; display: flex; align-items: flex-end; gap: 8px; pointer-events: none; }
+.phil-face { pointer-events: auto; width: 96px; height: 96px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .55)); transition: transform .15s; }
+.phil-face:hover { transform: scale(1.05) rotate(-3deg); }
+.phil-face:focus-visible { outline: 2px solid var(--led, #ffb02e); outline-offset: 3px; }
+.phil-face svg { width: 100%; height: 100%; display: block; }
+.phil-av.bob .phil-face { animation: phil-bob .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes phil-bob { 0% { transform: translateY(0); } 35% { transform: translateY(-8px) rotate(-4deg); } 100% { transform: translateY(0); } }
+.phil-av .av-23 { font: 400 15px "Anton", sans-serif; fill: #c8102e; letter-spacing: 1px; }
+
+.phil-av .mood { display: none; }
+.phil-av[data-mood="neutral"] .mood-neutral,
+.phil-av[data-mood="happy"] .mood-happy,
+.phil-av[data-mood="sad"] .mood-sad,
+.phil-av[data-mood="shock"] .mood-shock,
+.phil-av[data-mood="smug"] .mood-smug { display: inline; }
+.phil-av .eye { transform-box: fill-box; transform-origin: center; transition: transform .07s; }
+.phil-av.blink .eye { transform: scaleY(.1); }
+
+.phil-av .cig { opacity: 0; transition: opacity .2s; }
+.phil-av.cig-on .cig { opacity: 1; }
+.phil-av .ember { fill: #6b5a50; }
+.phil-av.lit .ember { fill: #ff5a1f; animation: ember 1.6s ease-in-out infinite; }
+@keyframes ember { 50% { fill: #ffb02e; } }
+.phil-av .puffs circle { fill: #d9d4cc; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.phil-av.puffing .puffs circle { animation: puff 2.4s ease-out infinite; }
+.phil-av.puffing .puffs circle:nth-child(2) { animation-delay: .8s; }
+.phil-av.puffing .puffs circle:nth-child(3) { animation-delay: 1.6s; }
+@keyframes puff { 0% { opacity: 0; transform: translate(0, 6px) scale(.4); } 25% { opacity: .75; } 100% { opacity: 0; transform: translate(6px, -22px) scale(1.5); } }
+.phil-av .lighter-hand { transform: translateY(40px); transition: transform .55s cubic-bezier(.3, 1.2, .5, 1); }
+.phil-av.lighter-up .lighter-hand { transform: translateY(-3px); }
+.phil-av .flame { opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
+.phil-av.flame-on .flame { opacity: 1; animation: flame .18s ease-in-out infinite alternate; }
+@keyframes flame { from { transform: scale(.85, 1); } to { transform: scale(1.1, 1.2) skewX(-6deg); } }
+
+.phil-bubble {
+  position: relative; max-width: 230px; margin-bottom: 52px; padding: 10px 13px;
+  background: #fff8ec; color: #1b0d07; border: 2px solid #1b0d07; border-radius: 14px 14px 4px 14px;
+  font: 600 14px/1.3 "Manrope", sans-serif; box-shadow: 3px 3px 0 #c8102e;
+}
+.phil-bubble::after { content: ""; position: absolute; right: -9px; bottom: 10px; border: 8px solid transparent; border-left-color: #1b0d07; border-right: 0; }
+.phil-bubble.pop { animation: bubble-pop .32s cubic-bezier(.2, 1.6, .4, 1); transform-origin: 100% 100%; }
+@keyframes bubble-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+@media (max-width: 640px) {
+  .phil-av { right: 8px; bottom: 8px; }
+  .phil-face { width: 64px; height: 64px; }
+  .phil-bubble { max-width: min(220px, calc(100vw - 96px)); margin-bottom: 34px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .phil-av *, .phil-av { animation: none !important; transition: none !important; }
+}
