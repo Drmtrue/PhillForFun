@@ -241,6 +241,17 @@ export class QuizStore extends DurableObject {
           samples INTEGER NOT NULL DEFAULT 1,
           PRIMARY KEY (game, league, day)
         )`,
+      // Every price refresh (at most every 20 minutes): price, sellers and stock, for intraday charts
+      `CREATE TABLE IF NOT EXISTS price_ticks (
+          game TEXT NOT NULL,
+          league TEXT NOT NULL,
+          ts INTEGER NOT NULL,
+          price REAL,
+          online INTEGER NOT NULL,
+          offers INTEGER NOT NULL,
+          stock INTEGER NOT NULL DEFAULT 0
+        )`,
+      `CREATE INDEX IF NOT EXISTS price_ticks_idx ON price_ticks (game, league, ts)`,
       `CREATE TABLE IF NOT EXISTS league_seen (
           game TEXT NOT NULL,
           league TEXT NOT NULL,
@@ -424,6 +435,10 @@ export class QuizStore extends DurableObject {
       if (!p || p.stale || !p.league) continue;
       // Remember when each league first appeared: the real launch moment if the calendar is out of date
       this.sql.exec("INSERT OR IGNORE INTO league_seen (game, league, first_seen) VALUES (?, ?, ?)", game, p.league, now);
+      this.sql.exec(
+        "INSERT INTO price_ticks (game, league, ts, price, online, offers, stock) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        game, p.league, Date.now(), p.price, p.onlineOffers || 0, p.offers || 0, p.stock || 0
+      );
       if (p.price == null) continue;
       this.sql.exec(
         `INSERT INTO price_history (game, league, day, price, samples) VALUES (?, ?, ?, ?, 1)
@@ -433,8 +448,11 @@ export class QuizStore extends DurableObject {
     }
   }
 
-  // Attach the current league's daily history to each game
+  // Attach the current league's daily history and the last 14 days of hourly ticks to each game.
+  // ticks: [hour start (ms), lowest price that hour, max online sellers, max offers, max online stock]
   withHistory(data) {
+    const since = Date.now() - 14 * 86400000;
+    this.sql.exec("DELETE FROM price_ticks WHERE ts < ?", Date.now() - 120 * 86400000);
     const out = { ...data, prices: { ...data.prices } };
     for (const [game, p] of Object.entries(out.prices)) {
       if (!p?.league) continue;
@@ -442,7 +460,16 @@ export class QuizStore extends DurableObject {
         "SELECT day, price FROM price_history WHERE game = ? AND league = ? ORDER BY day", game, p.league
       ).toArray();
       const seen = this.sql.exec("SELECT first_seen FROM league_seen WHERE game = ? AND league = ?", game, p.league).toArray()[0];
-      out.prices[game] = { ...p, firstSeen: seen?.first_seen || null, history: rows.map((r) => [r.day, Math.round(r.price * 10000) / 10000]) };
+      const ticks = this.sql.exec(
+        `SELECT (ts / 3600000) * 3600000 AS h, MIN(price) AS price, MAX(online) AS online, MAX(offers) AS offers, MAX(stock) AS stock
+         FROM price_ticks WHERE game = ? AND league = ? AND ts >= ? GROUP BY h ORDER BY h`, game, p.league, since
+      ).toArray();
+      out.prices[game] = {
+        ...p,
+        firstSeen: seen?.first_seen || null,
+        history: rows.map((r) => [r.day, Math.round(r.price * 10000) / 10000]),
+        ticks: ticks.map((t) => [t.h, t.price == null ? null : Math.round(t.price * 10000) / 10000, t.online, t.offers, t.stock])
+      };
     }
     return out;
   }

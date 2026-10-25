@@ -1,12 +1,12 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251533";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251533";
-import { initHoop } from "./hoop.js?v=202610251533";
-import { freeThrow } from "./freethrow.js?v=202610251533";
-import { onSkinChange } from "./ballskin.js?v=202610251533";
-import { mountSmoke } from "./game-smoke.js?v=202610251533";
-import { mountFarm } from "./game-farm.js?v=202610251533";
-import { mountBath } from "./game-bath.js?v=202610251533";
-import { initAvatar } from "./avatar.js?v=202610251533";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251538";
+import { renderRmt } from "./rmt-page.js?v=202610251538";
+import { initHoop } from "./hoop.js?v=202610251538";
+import { freeThrow } from "./freethrow.js?v=202610251538";
+import { onSkinChange } from "./ballskin.js?v=202610251538";
+import { mountSmoke } from "./game-smoke.js?v=202610251538";
+import { mountFarm } from "./game-farm.js?v=202610251538";
+import { mountBath } from "./game-bath.js?v=202610251538";
+import { initAvatar } from "./avatar.js?v=202610251538";
 
 const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 
@@ -950,13 +950,6 @@ function bumpIdle() {
 /* ---------- RMT exchange: cheapest Divine Orb on FunPay ---------- */
 const fmtPrice = (x) => x.toLocaleString("ru-RU", { maximumSignificantDigits: 3 });
 
-function minutesAgo(ts) {
-  const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
-  if (m < 1) return "только что";
-  if (m < 60) return `${m} мин назад`;
-  const h = Math.round(m / 60);
-  return `${h} ${plural(h, "час", "часа", "часов")} назад`;
-}
 
 async function loadPrices() {
   if (!API) return;
@@ -966,206 +959,11 @@ async function loadPrices() {
       .map(([key, short]) => data.prices?.[key] && { short, ...data.prices[key] })
       .filter(Boolean);
     if (!rows.length) return;
-    const box = $("rmt-rows");
-    box.innerHTML = "";
-    let converted = null;
-    for (const r of rows) {
-      if (r.source === "cbr" && r.original) converted = r;
-      const a = document.createElement("a");
-      a.className = "rmt-row";
-      a.href = r.url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      const left = document.createElement("div");
-      left.className = "rmt-game";
-      const b = document.createElement("b");
-      b.textContent = r.short;
-      const lg = document.createElement("span");
-      const phase = resolveSeason(SEASONS[r.short === "PoE 1" ? "poe1" : "poe2"], r.league, r.firstSeen).phase;
-      lg.textContent = r.league.replace(/^\(PC\)\s*/, "") + (phase === "live" ? "" : " · лига завершена");
-      if (phase !== "live") a.classList.add("rmt-stale");
-      const on = document.createElement("span");
-      on.className = "rmt-online";
-      on.textContent = `продавцов онлайн: ${r.onlineOffers} из ${r.offers}`;
-      left.append(b, lg, on);
-
-      const right = document.createElement("div");
-      right.className = "rmt-price";
-      const price = document.createElement("span");
-      price.className = "rmt-num";
-      price.textContent = r.price != null ? `${fmtPrice(r.price)} ₽` : "—";
-      right.append(price);
-      if (r.price != null && r.prev) {
-        const diff = ((r.price - r.prev) / r.prev) * 100;
-        const t = document.createElement("span");
-        // Phil sells, so a rising price is good news
-        t.className = "rmt-trend " + (diff >= 0 ? "up" : "down");
-        t.textContent = `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff).toFixed(1)}%`;
-        right.append(t);
-      }
-      const sub = document.createElement("span");
-      sub.className = "rmt-sub";
-      sub.textContent = r.price != null
-        ? `100 шт ≈ ${fmtPrice(r.price * 100)} ₽`
-        : "сейчас нет продавцов онлайн";
-      right.append(sub);
-      a.append(left, right);
-      box.append(a);
-    }
-    renderGoal(rows);
-    $("rmt-upd").textContent = data.updatedAt ? `FunPay · ${minutesAgo(data.updatedAt)}` : "FunPay";
-    $("rmt-note").textContent = "Самая низкая цена за 1 Divine Orb у продавцов онлайн в текущей лиге. Обновляется раз в 20 минут." +
-      (converted ? ` FunPay показывает цены в ${converted.original.unit}, пересчитано по курсу ЦБ: 1 ${converted.original.unit} = ${fmtPrice(converted.rate)} ₽.` : "");
-    $("rmt").hidden = false;
+    renderRmt($("rmt-root"), rows, data, store);
     $("rmt-loading").hidden = true;
     lastPrices = rows;
     $("hub-rmt").textContent = rows.filter((r) => r.price != null).map((r) => `${r.short}: ${fmtPrice(r.price)} ₽`).join(" · ") || "Цены FunPay";
   } catch (e) { console.error(e); }
-}
-
-// Savings goal: how many Divine Orbs to sell and how long to farm them
-const fmtInt = (x) => Math.round(x).toLocaleString("ru-RU");
-
-// Russian: fractional numbers take the genitive singular ("2,5 года"), whole numbers use plural()
-const yearsLabel = (y) => {
-  const r = Math.round(y * 10) / 10;
-  const word = Number.isInteger(r) ? plural(r, "год", "года", "лет") : "года";
-  return `${r.toLocaleString("ru-RU")} ${word}`;
-};
-
-function farmTime(hours) {
-  const days = hours / RMT_GOAL.hoursPerDay;
-  const when = days >= 365 ? yearsLabel(days / 365) : `${fmtInt(days)} ${plural(Math.round(days), "день", "дня", "дней")}`;
-  return { hours, when, nonstop: yearsLabel(hours / 24 / 365) };
-}
-
-const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
-const MONTHS_NOM = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
-const fmtDate = (t) => { const d = new Date(t); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
-const fmtMonthYear = (t) => { const d = new Date(t); return `${MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`; };
-const pct = (x) => `${(x * 100).toLocaleString("ru-RU", { maximumFractionDigits: x * 100 < 1 ? 1 : 0 })}%`;
-const days = (n) => `${Math.round(n)} ${plural(Math.round(n), "день", "дня", "дней")}`;
-
-// Small SVG chart of the modelled price over the league, today marker and real daily prices
-function priceChart(model, season, history) {
-  const W = 300, H = 74, pad = 4;
-  const { day, length } = seasonDay(season);
-  const max = priceAt(model, 0) * 1.05;
-  const x = (d) => pad + (d / length) * (W - pad * 2);
-  const y = (p) => H - pad - (p / max) * (H - pad * 2);
-  let path = "";
-  for (let d = 0; d <= length; d += Math.max(1, length / 80)) path += `${path ? "L" : "M"}${x(d).toFixed(1)},${y(priceAt(model, d)).toFixed(1)}`;
-  const start = Date.parse(season.start);
-  const dots = (history || []).map(([dd, p]) => {
-    const d = (Date.parse(dd + "T12:00:00Z") - start) / 86400000;
-    return d >= 0 && d <= length ? `<circle cx="${x(d).toFixed(1)}" cy="${y(p).toFixed(1)}" r="2.2" class="pc-real"/>` : "";
-  }).join("");
-  const today = Math.min(day, length);
-  return `<svg class="price-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Кривая цены Divine за сезон">
-    <path d="${path}" class="pc-curve"/>
-    <line x1="${x(today)}" y1="0" x2="${x(today)}" y2="${H}" class="pc-today"/>
-    ${dots}
-    <circle cx="${x(today).toFixed(1)}" cy="${y(priceAt(model, today)).toFixed(1)}" r="3.5" class="pc-now"/>
-  </svg>
-  <div class="pc-axis"><span>старт</span><span><i class="pc-dot now"></i>сегодня<i class="pc-dot real"></i>факт</span><span>конец</span></div>`;
-}
-
-const GOAL_OPEN_KEY = "phill_quiz_goal_open";
-
-function renderGoal(rows) {
-  const box = $("rmt-goal");
-  const priced = rows.filter((r) => r.price);
-  if (!RMT_GOAL || !priced.length) { box.hidden = true; return; }
-  box.innerHTML = "";
-
-  // Collapsible: a one-line summary with an explicit "details" pill; the open/closed state is remembered
-  const details = document.createElement("details");
-  details.className = "goal-details";
-  details.open = store.get(GOAL_OPEN_KEY, false);
-  details.addEventListener("toggle", () => store.set(GOAL_OPEN_KEY, details.open));
-  const summary = document.createElement("summary");
-  summary.className = "goal-summary";
-  const sLeft = document.createElement("div");
-  sLeft.className = "goal-summary-text";
-  const t = document.createElement("b");
-  t.textContent = `🎯 Цель: ${RMT_GOAL.title} · ${fmtInt(RMT_GOAL.priceRub)}\u00a0₽`;
-  const etaLine = document.createElement("span");
-  etaLine.className = "goal-summary-eta";
-  sLeft.append(t, etaLine);
-  const pill = document.createElement("span");
-  pill.className = "goal-toggle";
-  pill.innerHTML = '<span class="when-closed">Подробнее</span><span class="when-open">Свернуть</span><i aria-hidden="true">▾</i>';
-  summary.append(sLeft, pill);
-  const body = document.createElement("div");
-  body.className = "goal-body";
-  details.append(summary, body);
-  box.append(details);
-  const etas = [];
-
-  let anyEstimate = false;
-  for (const r of priced) {
-    const key = r.short === "PoE 1" ? "poe1" : "poe2";
-    const season = resolveSeason(SEASONS[key], r.league, r.firstSeen);
-    const rate = RMT_GOAL.divinesPerHour[key];
-    const need = Math.ceil(RMT_GOAL.priceRub / r.price);
-    const sd = seasonDay(season);
-    const model = calibrate(season, r.price, r.history, RMT_MODEL);
-    if (model.source === "estimate") anyEstimate = true;
-    const st = decayStats(model, season);
-    const fc = forecast({ season, model, divinesPerHour: rate, hoursPerDay: RMT_GOAL.hoursPerDay, goal: RMT_GOAL.priceRub });
-
-    const card = document.createElement("div");
-    card.className = "goal-line";
-    const g = document.createElement("b");
-    g.textContent = r.short;
-    const d = document.createElement("div");
-    const big = document.createElement("span");
-    big.className = "goal-big";
-    big.textContent = `${fmtInt(need)} Divine`;
-    d.append(big);
-
-    const nextText = `${season.nextName} — ${fmtDate(Date.parse(season.next))}`;
-    const seasonText =
-      season.phase === "ended" ? `Лига закончилась, цены уже неактуальны · ${nextText} (через ${days(sd.nextIn)})`
-      : season.phase === "waiting" ? `${season.nextName} уже стартовал, ждём продавцов на FunPay · пока показаны цены прошлой лиги`
-      : `Сезон «${season.league.replace(/^\(PC\)\s*/, "")}»: день ${Math.floor(sd.day) + 1} из ${Math.round(sd.length)} · до конца ${days(sd.left)} · ${nextText}` +
-        (season.estimated ? " (даты оценочные)" : "");
-    const lines = [
-      [`по сегодняшней цене, ≈ ${fmtInt(need / rate)} ч фарма`, ""],
-      [seasonText, "goal-season"],
-      [`Цена за сезон: ≈ ${fmtPrice(st.start)} ₽ на старте → ${fmtPrice(st.now)} ₽ сейчас → ${fmtPrice(st.end)} ₽ к концу`, ""],
-      [`Падение: −${pct(st.seasonDrop)} за сезон, −${pct(st.firstWeekDrop)} за первую неделю, ` +
-        (st.weekDropNow >= 0.005 ? `сейчас −${pct(st.weekDropNow)} в неделю` : "сейчас цена уже почти не падает"), ""],
-      [`До конца сезона заработает ≈ ${fmtInt(fc.thisSeason)} ₽ · первая неделя ${season.nextName} ≈ ${fmtInt(fc.firstWeekNext)} ₽`, "goal-money"],
-      [fc.goalAt ? `Накопит на ПК ≈ ${fmtMonthYear(fc.goalAt)} (≈ ${fmtInt(fc.seasonsToGoal)} ${plural(Math.round(fc.seasonsToGoal), "сезон", "сезона", "сезонов")})` : "Накопить не выйдет даже за 40 лет", "goal-eta"]
-    ];
-    for (const [txt, cls] of lines) {
-      const el = document.createElement("span");
-      el.className = "goal-sub " + cls;
-      el.textContent = txt;
-      d.append(el);
-    }
-    const chart = document.createElement("div");
-    chart.className = "goal-chart";
-    chart.innerHTML = priceChart(model, season, r.history);
-    d.append(chart);
-    card.append(g, d);
-    body.append(card);
-    if (fc.goalAt) etas.push(`${r.short}: ПК\u00a0≈ ${fmtMonthYear(fc.goalAt)}`);
-  }
-  etaLine.textContent = etas.length ? etas.join(" · ") : "считаю…";
-
-  const note = document.createElement("p");
-  note.className = "goal-note";
-  note.textContent =
-    `Темп фарма: ${RMT_GOAL.divinesPerHour.poe1} Divine в час по ${RMT_GOAL.hoursPerDay} ч в день (игрок выше среднего: уверенный маппер 3–6/ч, дисциплинированный фармер 10–20/ч). ` +
-    `Между сезонами дохода нет, новые сезоны повторяют ту же кривую цены. ` +
-    (anyEstimate
-      ? `Кривая цены пока оценочная: публичной истории RMT-цен нет, поэтому принято, что на старте Divine стоит ×${RMT_MODEL.k} от поздней цены и наценка спадает за ~${RMT_MODEL.tau} дней. Сервер записывает реальные цены каждый день; с ${MIN_POINTS}+ дней данных кривая строится по ним.`
-      : `Кривая цены построена по реальным ежедневным ценам FunPay за этот сезон.`) +
-    ` Продажа по самой низкой цене FunPay, без учёта комиссии.`;
-  body.append(note);
-  box.hidden = false;
 }
 
 /* ---------- Side-court baskets (separate from quiz points) ---------- */

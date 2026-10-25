@@ -148,6 +148,11 @@ async function fetchOne(key, cookie) {
   const { name: league, list, id: leagueId } = main;
   const online = list.filter((o) => o.online);
   const cheapest = online.length ? online.reduce((a, b) => (b.price < a.price ? b : a)) : null;
+  // Order book: the cheapest online offers, plus the median price and total stock of online sellers
+  const sorted = [...online].sort((a, b) => a.price - b.price);
+  const ladder = sorted.slice(0, 10).map((o) => ({ price: o.price, amount: o.amount }));
+  const median = sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)].price : null;
+  const stock = online.reduce((sum, o) => sum + o.amount, 0);
   const newer = ranked.filter((g) => g.id > leagueId).map((g) => g.name); // spotted but not liquid yet
   return {
     game: src.title,
@@ -158,7 +163,10 @@ async function fetchOne(key, cookie) {
     offers: list.length,
     onlineOffers: online.length,
     leagueId,
-    newerLeagues: newer
+    newerLeagues: newer,
+    ladder,
+    median,
+    stock
   };
 }
 
@@ -181,6 +189,8 @@ export async function fetchDivinePrices() {
       if (!rate) throw new Error(`no rate for ${p.unit}`);
       p.original = p.price != null ? { price: p.price, unit: p.unit } : null;
       p.price = p.price != null ? p.price * rate : null;
+      p.median = p.median != null ? p.median * rate : null;
+      p.ladder = (p.ladder || []).map((o) => ({ ...o, price: o.price * rate }));
       p.unit = "₽";
       p.source = "cbr";
       p.rate = Math.round(rate * 100) / 100;

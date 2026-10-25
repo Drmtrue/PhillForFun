@@ -14,7 +14,7 @@ The site is a single page with hash routes, so switching sections never reloads 
 | --- | --- |
 | `#/` | Home: hero with the jersey and easter eggs, cards linking to every section with live teasers (quiz leader, current prices, achievements opened) |
 | `#/quiz` | Quiz: start form, leaderboard, fact submission, question and result screens (a game in progress survives switching sections) |
-| `#/rmt` | RMT exchange: Divine Orb prices and the PC savings goal |
+| `#/rmt` | RMT exchange page (`rmt-page.js`): sticky in-page menu, overview cards, charts, order book, season timelines, savings goal with a farm-rate calculator, method notes |
 | `#/games` | Mini-games list: free-throw practice (inline), the side-court hoop, and links to the full-screen games below |
 | `#/games/smoke`, `#/games/farm`, `#/games/bath` | Перекур-кликер, Фарм диванов, Ванна (see below) |
 | `#/ach` | Achievements shared by the whole site |
@@ -74,7 +74,7 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | `GET` | `/scores` | Leaderboard: attempts, total points, average and achievement count per player, sorted by average |
 | `GET` | `/player?name=` | One player's attempts, points, average and side-court baskets |
 | `POST` | `/baskets` | Add side-court baskets `{ name, add }` (counted separately from quiz points) |
-| `GET` | `/prices` | Cheapest Divine Orb (PoE 1 / PoE 2) on FunPay in rubles: current league, online sellers only; cached 20 min |
+| `GET` | `/prices` | Cheapest Divine Orb (PoE 1 / PoE 2) on FunPay in rubles: current league, online sellers only; cached 20 min; includes daily `history`, hourly `ticks` (14 days), `ladder` (10 cheapest online offers), `median` and online `stock` |
 | `GET` | `/achievements?name=` | Achievement ids unlocked by a player |
 | `POST` | `/achievements` | Unlock achievements `{ name, ids: [...] }` |
 | `POST` | `/scores` | Save a result `{ name, score, total }` |
@@ -117,9 +117,20 @@ The "Биржа РМТ" panel shows the cheapest price for 1 Divine Orb on FunPa
 
 Below the prices is a savings goal (`RMT_GOAL` in `config.js`: a new PC for 250 000 ₽). For each game it shows how many Divine Orbs must be sold at the current cheapest price, how many hours of farming that is at 8 Divine/hour (an above-average player: between "comfortable mapper" 3–6/h and "disciplined farmer" 10–20/h in community estimates), the same in years at 6 hours a day and non-stop, and the resulting income per hour. Sources for the rates are noted in `config.js`.
 
-### Season forecast
+### Exchange page
 
-The goal block is collapsed by default to a one-line summary (goal, price and the estimated month per game) with a "Подробнее ▾" toggle; the open/closed state is remembered per browser.
+`rmt-page.js` renders the section from `/prices`; charts come from `charts.js` (dependency-free SVG line charts with a crosshair tooltip, legend, reference lines and markers, redrawn on resize). PoE 1 and PoE 2 use a validated amber/blue pair (`#cc8208`, `#3b8fe8`).
+
+- **Обзор:** per game — cheapest price with trend, 100 pcs, online sellers out of all, median online price, online stock, price vs league start, day of season.
+- **Графики:** hourly minimum price and online sellers for the last 24 h / 3 / 14 days (both games), and per-game season curves (model line, real daily minimums, today marker). Prices of the two games differ in scale, so season curves are separate small charts rather than a shared axis.
+- **Стакан:** the 10 cheapest online offers per game with stock bars (log scale) and the spread.
+- **Сезоны:** timelines from league start to end and the next league, with a today marker and countdowns.
+- **Копилка:** always open. Sliders for Divine per hour and hours per day (remembered per browser) recompute what to sell, farm time, earnings this league and the first week of the next, the month the PC is affordable, and a savings chart against the 250 000 ₽ goal.
+- **Как считаем:** the method and assumptions.
+
+The Worker stores a snapshot on every price refresh (`price_ticks`: price, online sellers, offers, online stock; kept 120 days) and returns hourly buckets for the last 14 days as `ticks`, plus `ladder`, `median` and `stock` per game.
+
+### Season forecast
 
 `rmtmodel.js` turns the current price into a season-aware forecast, using the league calendar in `SEASONS` (`config.js`):
 

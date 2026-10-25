@@ -87,7 +87,8 @@ export function calibrate(season, todayPrice, history, defaults, now = Date.now(
 
 // Walks day by day from now: farming income during leagues, nothing in the gap between leagues,
 // then the next leagues follow the same calendar rhythm and price curve.
-export function forecast({ season, model, divinesPerHour, hoursPerDay, goal, now = Date.now(), maxYears = 40 }) {
+// track = true also returns weekly [time, saved] points for a savings chart
+export function forecast({ season, model, divinesPerHour, hoursPerDay, goal, now = Date.now(), maxYears = 40, track = false }) {
   const start = Date.parse(season.start);
   const end = Date.parse(season.end);
   const next = Date.parse(season.next || season.end);
@@ -101,6 +102,8 @@ export function forecast({ season, model, divinesPerHour, hoursPerDay, goal, now
   let goalAt = null;
   let seasonIndex = 0;
   let seasonStart = start;
+  const points = track ? [[now, 0]] : null;
+  let step = 0;
 
   for (let t = now; t < now + maxYears * 365 * DAY; t += DAY) {
     // Move to the season that contains t
@@ -109,19 +112,21 @@ export function forecast({ season, model, divinesPerHour, hoursPerDay, goal, now
       seasonIndex++;
     }
     const inLeague = t >= seasonStart && t < seasonStart + length;
+    if (track && ++step % 7 === 0) points.push([t, saved]);
     if (!inLeague) continue;
     const d = (t - seasonStart) / DAY;
     const income = perDayDivines * priceAt(model, d);
     saved += income;
     if (seasonIndex === 0) thisSeason += income;
     if (seasonIndex === 1 && d < 7) firstWeekNext += income;
-    if (saved >= goal && !goalAt) { goalAt = t; break; }
+    if (saved >= goal && !goalAt) { goalAt = t; if (track) points.push([t, saved]); break; }
   }
 
   return {
     thisSeason,
     firstWeekNext,
     goalAt,
+    points,
     seasonsToGoal: goalAt ? Math.max(0, Math.round((goalAt - start) / (length + gap) * 10) / 10) : null
   };
 }
