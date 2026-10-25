@@ -177,8 +177,8 @@ const LINES = {
 
 const MOODS = ["neutral", "happy", "sad", "shock", "smug"];
 const last = {};
-function pickLine(key) {
-  const list = LINES[key].lines;
+function pickLine(key, ev = LINES[key]) {
+  const list = ev.lines;
   let i = Math.floor(Math.random() * list.length);
   if (list.length > 1 && i === last[key]) i = (i + 1) % list.length;
   last[key] = i;
@@ -289,7 +289,7 @@ export function initAvatar() {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251523")
+  import("./phil3d.js?v=202610251533")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, {
         bubble,
@@ -374,8 +374,9 @@ export function initAvatar() {
 
   // Shows a line for an event. Lower-priority events do not interrupt a more important line,
   // and minor events are rate-limited so Phil does not talk over every click.
+  // key: an event name from LINES, or a pool object { id, mood, pri, lines, act?, chance? } (used by mini-games)
   function say(key, { force = false } = {}) {
-    const ev = LINES[key];
+    const ev = typeof key === "string" ? LINES[key] : key;
     if (!ev) return;
     const now = performance.now();
     const busy = !bubble.hidden;
@@ -384,7 +385,7 @@ export function initAvatar() {
       if (busy && current && current.pri > ev.pri) return;
       if (ev.pri <= 1 && now - lastSaid < 3500) return;
     }
-    const line = pickLine(key);
+    const line = pickLine(typeof key === "string" ? key : ev.id, ev);
     current = { pri: ev.pri };
     lastSaid = now;
     bubble.textContent = line.t;
@@ -393,7 +394,7 @@ export function initAvatar() {
     void bubble.offsetWidth;
     bubble.classList.add("pop");
     if (body3d) {
-      let act = ACTS[key] || ev.mood;
+      let act = ev.act || ACTS[key] || ev.mood;
       if (Array.isArray(act)) act = act[Math.floor(Math.random() * act.length)];
       if (!(line.smoke && !isSmoking())) body3d.react(act);
     } else {

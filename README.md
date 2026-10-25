@@ -15,10 +15,21 @@ The site is a single page with hash routes, so switching sections never reloads 
 | `#/` | Home: hero with the jersey and easter eggs, cards linking to every section with live teasers (quiz leader, current prices, achievements opened) |
 | `#/quiz` | Quiz: start form, leaderboard, fact submission, question and result screens (a game in progress survives switching sections) |
 | `#/rmt` | RMT exchange: Divine Orb prices and the PC savings goal |
-| `#/games` | Mini-games: free-throw practice (streak, record, accuracy; achievements for 5 and 10 in a row), the side-court hoop, and upcoming games |
+| `#/games` | Mini-games list: free-throw practice (inline), the side-court hoop, and links to the full-screen games below |
+| `#/games/smoke`, `#/games/farm`, `#/games/bath` | Перекур-кликер, Фарм диванов, Ванна (see below) |
 | `#/ach` | Achievements shared by the whole site |
 
-To add a mini-game, add a card to the games section in `index.html` and its logic to `app.js` (or its own module), unlocking achievements with `unlock()`.
+### Mini-games
+
+Each full-screen game is its own module with a `mount<Name>(el, ctx)` function. `ctx` gives it `unlock(id)`, `say(pool)` (Phil speaks a line from a `{ id, mood, pri, lines }` pool), `phil`, `sfx`, `store`, `goalRub`, `divinePrice()` (today's PoE 1 FunPay price) and `onShow(fn)`. Records live in the browser.
+
+- **Перекур-кликер** (`game-smoke.js`): click the cigarette to take a drag (it burns down, 12 drags per cigarette). Smoke buys upgrades for more smoke per click or per second (cost × 1.15 per level). Idle income keeps running while the page is open, and at half rate for up to 8 hours while it is closed. Every 5th cigarette, the 3D Phil lights up too.
+- **Фарм диванов** (`game-farm.js`): a 90-second league of 30 game days. Each "run a map" click can drop a Divine (22%, or a stack of 5 at 1.5%). The price starts at 3× today's real FunPay price and decays along the RMT model curve with daily noise. Random events: drop nerf, strategy leak, bots, build hype, Phil in the bath. Sales can get scammed (7%, half the money lost). Unsold Divines burn at league end; the result is compared with the PC goal.
+- **Ванна** (`game-bath.js`): keep the water between 30° and 45° (36–42° is comfy) by holding the hot tap, keep Phil awake by splashing him (sleepiness grows with time and with hot water), and catch the phone within 1.7 s when he drops it. Score = seconds survived.
+
+Achievements: 3 for the clicker, 4 for the farm, 3 for the bath, plus 2 for free-throw practice streaks.
+
+To add another game, add a card and a `.game-view` to `index.html`, a module with `mount…(el, ctx)`, and register it in `GAMES` in `app.js`.
 
 ## How it works
 

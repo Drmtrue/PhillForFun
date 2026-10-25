@@ -1,9 +1,12 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251523";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251523";
-import { initHoop } from "./hoop.js?v=202610251523";
-import { freeThrow } from "./freethrow.js?v=202610251523";
-import { onSkinChange } from "./ballskin.js?v=202610251523";
-import { initAvatar } from "./avatar.js?v=202610251523";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251533";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251533";
+import { initHoop } from "./hoop.js?v=202610251533";
+import { freeThrow } from "./freethrow.js?v=202610251533";
+import { onSkinChange } from "./ballskin.js?v=202610251533";
+import { mountSmoke } from "./game-smoke.js?v=202610251533";
+import { mountFarm } from "./game-farm.js?v=202610251533";
+import { mountBath } from "./game-bath.js?v=202610251533";
+import { initAvatar } from "./avatar.js?v=202610251533";
 
 const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 
@@ -1015,6 +1018,7 @@ async function loadPrices() {
       (converted ? ` FunPay показывает цены в ${converted.original.unit}, пересчитано по курсу ЦБ: 1 ${converted.original.unit} = ${fmtPrice(converted.rate)} ₽.` : "");
     $("rmt").hidden = false;
     $("rmt-loading").hidden = true;
+    lastPrices = rows;
     $("hub-rmt").textContent = rows.filter((r) => r.price != null).map((r) => `${r.short}: ${fmtPrice(r.price)} ₽`).join(" · ") || "Цены FunPay";
   } catch (e) { console.error(e); }
 }
@@ -1284,14 +1288,40 @@ $("ft-practice").addEventListener("click", async () => {
 });
 renderPractice();
 
+/* ---------- Mini-games with their own views (#/games/<id>) ---------- */
+let lastPrices = null;
+const gameShowHooks = {};
+function gameCtx(id) {
+  return {
+    unlock,
+    say: (pool, opts) => phil.say(pool, opts),
+    phil,
+    sfx,
+    store,
+    goalRub: RMT_GOAL.priceRub,
+    divinePrice: () => lastPrices?.find((r) => r.short === "PoE 1")?.price || null,
+    onShow: (fn, once) => (gameShowHooks[id] ||= []).push({ fn, once })
+  };
+}
+mountSmoke($("g-smoke"), gameCtx("smoke"));
+mountFarm($("g-farm"), gameCtx("farm"));
+mountBath($("g-bath"), gameCtx("bath"));
+const GAMES = ["smoke", "farm", "bath"];
+
 /* ---------- Sections (hash routes) ---------- */
 const PAGES = ["home", "quiz", "rmt", "games", "ach"];
 function route() {
-  const name = (location.hash.match(/^#\/?([\w-]+)/) || [])[1];
+  const [, name, sub] = location.hash.match(/^#\/?([\w-]+)?\/?([\w-]+)?/) || [];
   const page = PAGES.includes(name) ? name : "home";
+  const game = page === "games" && GAMES.includes(sub) ? sub : null;
+  document.querySelectorAll(".game-view").forEach((v) => { v.hidden = v.dataset.game !== game; });
+  $("games-list").hidden = $("games-head").hidden = !!game;
+  if (game && gameShowHooks[game]) {
+    gameShowHooks[game] = gameShowHooks[game].filter((h) => { setTimeout(h.fn, 400); return !h.once; });
+  }
   document.querySelectorAll(".page").forEach((p) => { p.hidden = p.dataset.page !== page; });
   document.querySelectorAll(".topnav a").forEach((a) => {
-    const on = a.dataset.page === page;
+    const on = a.dataset.page === page; // the games tab stays active inside a game view
     a.classList.toggle("active", on);
     if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
