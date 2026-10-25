@@ -1,0 +1,7 @@
+# Не выкладывать на сайт
+worker
+.git
+.github
+README.md
+.assetsignore
+.gitignore
