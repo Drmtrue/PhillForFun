@@ -1,4 +1,4 @@
-import { QUIZ, API_URL } from "./config.js";
+import { QUIZ, API_URL } from "./config.js?v=202610251144";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -172,6 +172,9 @@ function unlock(id) {
   unlocked.add(id);
   saveLocalAch();
   toast(`${a.icon} Ачивка: ${a.title}`, a.desc);
+  // Small delay so it does not clash with the answer sound
+  // Easter egg handlers play their own sparkle, so the fanfare comes a bit later for those
+  setTimeout(() => sfx.achievement(), a.secret ? 650 : 280);
   if (game && !game.done) game.newAch.push(id);
   else if (game && game.done) addNewAchToResult(id);
   const name = getName();
@@ -213,6 +216,97 @@ function addNewAchToResult(id) {
   chip.textContent = `${a.icon} ${a.title}`;
   $("new-ach-list").append(chip);
 }
+
+/* ---------- Sound (synthesized with Web Audio, no files) ---------- */
+const SOUND_KEY = "phill_quiz_sound";
+let soundOn = store.get(SOUND_KEY, true);
+let audioCtx = null;
+
+function ctx() {
+  if (!soundOn) return null;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  } catch (_) { return null; }
+}
+
+// One oscillator note with a quick attack and exponential decay
+function tone(ac, { freq, to = freq, start = 0, dur = 0.15, type = "sine", vol = 0.25 }) {
+  const t = ac.currentTime + start;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if (to !== freq) osc.frequency.exponentialRampToValueAtTime(to, t + dur);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
+
+// Filtered white noise burst; optional sweep of the filter frequency
+function noise(ac, { start = 0, dur = 0.1, type = "highpass", freq = 2000, to = freq, q = 0.7, vol = 0.2 }) {
+  const t = ac.currentTime + start;
+  const len = Math.max(1, Math.floor(ac.sampleRate * dur));
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 1.5;
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  const filter = ac.createBiquadFilter();
+  filter.type = type;
+  filter.Q.value = q;
+  filter.frequency.setValueAtTime(freq, t);
+  if (to !== freq) filter.frequency.exponentialRampToValueAtTime(to, t + dur);
+  const gain = ac.createGain();
+  gain.gain.value = vol;
+  src.connect(filter).connect(gain).connect(ac.destination);
+  src.start(t);
+}
+
+const sfx = {
+  // Bubble "plop": bigger bubble = lower pitch
+  pop(size) {
+    const ac = ctx(); if (!ac) return;
+    const base = Math.max(260, 980 - size * 18) * (0.9 + Math.random() * 0.2);
+    tone(ac, { freq: base * 1.8, to: base * 0.45, dur: 0.12, vol: 0.32 });
+    noise(ac, { dur: 0.025, freq: 2500, vol: 0.18 });
+  },
+  // Correct answer: net "swish" + bright two-note ding
+  swish() {
+    const ac = ctx(); if (!ac) return;
+    noise(ac, { dur: 0.28, type: "bandpass", freq: 5200, to: 1400, q: 1.2, vol: 0.35 });
+    tone(ac, { freq: 880, start: 0.12, dur: 0.18, type: "triangle", vol: 0.16 });
+    tone(ac, { freq: 1318.5, start: 0.2, dur: 0.32, type: "triangle", vol: 0.16 });
+  },
+  // Wrong answer: ball thuds off the rim + short arena buzzer
+  brick() {
+    const ac = ctx(); if (!ac) return;
+    tone(ac, { freq: 140, to: 55, dur: 0.22, vol: 0.45 });
+    noise(ac, { dur: 0.08, type: "lowpass", freq: 900, vol: 0.3 });
+    tone(ac, { freq: 520, to: 470, start: 0.05, dur: 0.18, type: "triangle", vol: 0.05 }); // rim clank
+    tone(ac, { freq: 110, start: 0.22, dur: 0.38, type: "sawtooth", vol: 0.07 }); // buzzer
+    tone(ac, { freq: 116, start: 0.22, dur: 0.38, type: "square", vol: 0.04 });
+  },
+  // Achievement: short rising fanfare
+  achievement() {
+    const ac = ctx(); if (!ac) return;
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+      tone(ac, { freq: f, start: i * 0.09, dur: i === 3 ? 0.45 : 0.14, type: "triangle", vol: 0.18 }));
+    tone(ac, { freq: 1567.98, start: 0.27, dur: 0.5, type: "sine", vol: 0.06 });
+  },
+  // Easter egg: magical sparkle glissando
+  egg() {
+    const ac = ctx(); if (!ac) return;
+    const notes = [1046.5, 1318.5, 1568, 2093, 1760, 2637, 3136];
+    notes.forEach((f, i) => tone(ac, { freq: f, start: i * 0.055, dur: 0.22, type: "sine", vol: 0.1 }));
+    noise(ac, { start: 0.05, dur: 0.5, type: "highpass", freq: 6000, vol: 0.05 });
+    tone(ac, { freq: 392, to: 784, dur: 0.35, type: "triangle", vol: 0.08 });
+  }
+};
 
 /* ---------- Toasts and effects ---------- */
 function toast(title, sub = "") {
@@ -368,6 +462,7 @@ function pick(btn, text) {
   if (!right && WORK_WORDS.test(text)) unlock("workaholic");
   if (right && /аджик/i.test(cur.q + " " + cur.correct)) unlock("adjika");
 
+  right ? sfx.swish() : sfx.brick();
   $("live-score").textContent = game.score;
   $("call").textContent = right ? pickOne(SWISH) : pickOne(BRICK);
   $("call").className = "call " + (right ? "swish" : "brick");
@@ -556,6 +651,7 @@ clicks($("jersey"), 3, 1200, () => {
   void $("jersey").offsetWidth;
   $("jersey").classList.add("flip");
   setTimeout(() => (num.textContent = comeback ? "45" : "23"), 300);
+  sfx.egg();
   if (comeback) {
     toast("I'm back.", "Фил тоже однажды вернётся. На работу — вряд ли.");
     unlock("jersey45");
@@ -566,6 +662,7 @@ clicks($("jersey"), 3, 1200, () => {
 
 // 2. Smoke above the jersey: five puffs
 clicks($("smoke"), 5, 2500, () => {
+  sfx.egg();
   overlay(`<p class="overlay-big">💨</p><h2>Фил вышел покурить</h2><p>Вернётся через 5 минут. По его часам — через полтора часа.</p>`, "smoky");
   unlock("smoke");
 }, (n, e) => {
@@ -577,47 +674,6 @@ clicks($("smoke"), 5, 2500, () => {
 });
 
 // 3. Bath bubbles: pop ten (with a splash and a "plop")
-const SOUND_KEY = "phill_quiz_sound";
-let soundOn = store.get(SOUND_KEY, true);
-let audioCtx = null;
-
-// Synthesized pop: a quick pitch-dropping blip plus a tiny filtered click. No audio files needed.
-function popSound(size) {
-  if (!soundOn) return;
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
-    const t = audioCtx.currentTime;
-    const base = Math.max(260, 980 - size * 18) * (0.9 + Math.random() * 0.2); // bigger bubble = lower pop
-
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(base * 1.8, t);
-    osc.frequency.exponentialRampToValueAtTime(base * 0.45, t + 0.09);
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.32, t + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + 0.14);
-
-    const len = Math.floor(audioCtx.sampleRate * 0.025);
-    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buf;
-    const hp = audioCtx.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = 2500;
-    const ng = audioCtx.createGain();
-    ng.gain.value = 0.18;
-    noise.connect(hp).connect(ng).connect(audioCtx.destination);
-    noise.start(t);
-  } catch (_) { /* audio is optional */ }
-}
-
 function splash(x, y, size) {
   const burst = document.createElement("div");
   burst.className = "burst";
@@ -649,7 +705,7 @@ document.querySelectorAll(".bubbles i").forEach((b) => {
     b.dataset.popped = "1";
     b.style.visibility = "hidden";
     splash(r.left + r.width / 2, r.top + r.height / 2, r.width);
-    popSound(r.width);
+    sfx.pop(r.width);
     popped++;
     // Respawn the bubble from the bottom after a moment
     setTimeout(() => {
@@ -660,6 +716,7 @@ document.querySelectorAll(".bubbles i").forEach((b) => {
       delete b.dataset.popped;
     }, 600);
     if (popped === 10) {
+      sfx.egg();
       toast("🛁 Буль!", "Фил бы не одобрил: пена — это святое.");
       unlock("bubbles");
     }
@@ -673,7 +730,7 @@ $("sound-btn").addEventListener("click", () => {
   soundOn = !soundOn;
   store.set(SOUND_KEY, soundOn);
   renderSoundBtn();
-  if (soundOn) popSound(20);
+  if (soundOn) sfx.achievement();
 });
 renderSoundBtn();
 
@@ -686,6 +743,7 @@ $("sb-ball").addEventListener("click", () => {
   void ball.offsetWidth;
   ball.classList.add("bounce");
   if (dribbles === 23) {
+    sfx.egg();
     rain("🏀", 23);
     toast("⛹️ 23 касания", "Майкл бы кивнул. Фил бы спросил, где он в этой схеме.");
     unlock("dribble");
@@ -694,6 +752,7 @@ $("sb-ball").addEventListener("click", () => {
 
 // 5. "Где ты в этой схеме?" opens the actual scheme
 $("scheme-link").addEventListener("click", () => {
+  sfx.egg();
   overlay(`
     <h2>Схема</h2>
     <svg class="scheme" viewBox="0 0 340 250" role="img" aria-label="Схема жизни Фила">
@@ -724,6 +783,7 @@ clicks($("title-word"), 3, 1500, () => {
   const w = $("title-word");
   if (w.dataset.busy) return;
   w.dataset.busy = "1";
+  sfx.egg();
   w.classList.add("glitch");
   w.textContent = "Работающего";
   setTimeout(() => {
@@ -747,6 +807,7 @@ document.addEventListener("keydown", (e) => {
   codes = [...codes, e.code].slice(-KONAMI.length);
   if (codes.join() === KONAMI.join()) {
     codes = [];
+    sfx.egg();
     rain(["🏀", "💸", "🎮"], 34);
     overlay(`<p class="overlay-big">🎮</p><h2>Чит-код активирован</h2><p>+1 рабочий день добавлен в резюме Фила.</p><p class="muted">…шутка. Их всё ещё ноль.</p>`);
     unlock("konami");
@@ -756,11 +817,13 @@ document.addEventListener("keydown", (e) => {
   if (e.key && e.key.length === 1) typed = (typed + e.key.toLowerCase()).slice(-12);
   if (/x23x$|ч23ч$/.test(typed)) {
     typed = "";
+    sfx.egg();
     rain("🏀", 30);
     toast("🎽 x23x в здании", "Старый ник, вечная легенда.");
     unlock("nick");
   } else if (/аджика$|adjika$/.test(typed)) {
     typed = "";
+    sfx.egg();
     rain("🌶️", 36);
     document.body.classList.add("spicy");
     setTimeout(() => document.body.classList.remove("spicy"), 2600);
@@ -768,6 +831,7 @@ document.addEventListener("keydown", (e) => {
     unlock("spicy");
   } else if (/poe$|зщу$/.test(typed)) {
     typed = "";
+    sfx.egg();
     const orb = document.createElement("div");
     orb.className = "orb-drop";
     orb.innerHTML = '<span class="orb"></span><b>Сфера возвышения</b><small>Продано через РМТ за 30 центов</small>';
