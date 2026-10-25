@@ -23,3 +23,19 @@ export const RMT_GOAL = {
   divinesPerHour: { poe1: 8, poe2: 8 },
   hoursPerDay: 6
 };
+
+// League calendar (UTC). Sources: pathofexile.com announcement for 3.29 end / 3.30 launch, seasondex.com.
+//   PoE 1: Curse of the Allflame (3.29) launched Jul 24, 2026; ends Nov 9, 2026 1 PM PST; 3.30 launches Nov 13, 2026.
+//   PoE 2: Runes of Aldur (0.5) launched May 29, 2026 1 PM PDT; ends Dec 11, 2026; 1.0 launches Dec 11, 2026.
+// Launch times not announced yet use 8 PM UTC (GGG's usual 1 PM PT slot). Update these when GGG announces new dates.
+export const SEASONS = {
+  poe1: { league: "Curse of the Allflame", start: "2026-07-24T20:00:00Z", end: "2026-11-09T21:00:00Z", next: "2026-11-13T20:00:00Z", nextName: "3.30" },
+  poe2: { league: "Runes of Aldur", start: "2026-05-29T20:00:00Z", end: "2026-12-11T19:00:00Z", next: "2026-12-11T20:00:00Z", nextName: "1.0" }
+};
+
+// Price curve shape used until there are 5+ days of real FunPay history for the current league:
+// launch price = k × the settled late-league price, and the launch premium fades with a time constant of tau days.
+// Assumption: no public RMT price history exists; in-game data shows Divines carry a 20–35% week-1 premium
+// over week 3 (in Chaos terms), and real-money prices fall harder as fresh supply floods in.
+// k = 3, tau = 10 → ×3 at launch, ×1.7 after a week, ×1.25 after three weeks.
+export const RMT_MODEL = { k: 3, tau: 10 };

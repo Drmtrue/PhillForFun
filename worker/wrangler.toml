@@ -22,5 +22,9 @@ FACTS_PER_DAY_TOTAL = "100"
 #   AI_API_KEY        - API key for Root AI - model b1t quiz v1.1
 #   ADMIN_TOKEN       - any long password for the admin.html page
 
+# Hourly refresh of the Divine Orb prices (also builds the daily price history)
+[triggers]
+crons = ["17 * * * *"]
+
 [observability]
 enabled = true

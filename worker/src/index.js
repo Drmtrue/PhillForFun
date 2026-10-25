@@ -18,6 +18,12 @@ const json = (data, status = 200) =>
 const clean = (s, max) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 export default {
+  // Hourly cron: keep the price cache and the daily history fresh even when nobody visits
+  async scheduled(event, env, ctx) {
+    const store = env.STORE.get(env.STORE.idFromName("main"));
+    ctx.waitUntil(store.divinePrices(fetchDivinePrices));
+  },
+
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
@@ -227,6 +233,14 @@ export class QuizStore extends DurableObject {
           k TEXT PRIMARY KEY,
           v TEXT NOT NULL
         )`,
+      `CREATE TABLE IF NOT EXISTS price_history (
+          game TEXT NOT NULL,
+          league TEXT NOT NULL,
+          day TEXT NOT NULL,
+          price REAL NOT NULL,
+          samples INTEGER NOT NULL DEFAULT 1,
+          PRIMARY KEY (game, league, day)
+        )`,
       `CREATE TABLE IF NOT EXISTS baskets (
           name_key TEXT PRIMARY KEY,
           count INTEGER NOT NULL DEFAULT 0,
@@ -365,9 +379,9 @@ export class QuizStore extends DurableObject {
     const TTL = 20 * 60 * 1000;
     const row = this.sql.exec("SELECT v FROM kv WHERE k = 'divine2'").toArray()[0];
     const cached = row ? JSON.parse(row.v) : null;
-    if (cached && Date.now() - cached.updatedAt < TTL) return cached;
+    if (cached && Date.now() - cached.updatedAt < TTL) return this.withHistory(cached);
     // Only one refresh at a time; other callers get the cached copy meanwhile
-    if (this.refreshing) return cached || { prices: {}, updatedAt: 0, stale: true };
+    if (this.refreshing) return cached ? this.withHistory(cached) : { prices: {}, updatedAt: 0, stale: true };
     this.refreshing = true;
     try {
       const { prices, errors } = await fetcher();
@@ -386,13 +400,40 @@ export class QuizStore extends DurableObject {
         }
       }
       this.sql.exec("INSERT INTO kv (k, v) VALUES ('divine2', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", JSON.stringify(next));
-      return next;
+      this.recordHistory(next.prices);
+      return this.withHistory(next);
     } catch (e) {
       console.error("prices", e);
-      return cached ? { ...cached, stale: true } : { prices: {}, updatedAt: 0, stale: true };
+      return cached ? this.withHistory({ ...cached, stale: true }) : { prices: {}, updatedAt: 0, stale: true };
     } finally {
       this.refreshing = false;
     }
+  }
+
+  // One row per game, league and UTC day: the lowest online price seen that day
+  recordHistory(prices) {
+    const day = new Date().toISOString().slice(0, 10);
+    for (const [game, p] of Object.entries(prices || {})) {
+      if (!p || p.stale || p.price == null || !p.league) continue;
+      this.sql.exec(
+        `INSERT INTO price_history (game, league, day, price, samples) VALUES (?, ?, ?, ?, 1)
+         ON CONFLICT(game, league, day) DO UPDATE SET price = MIN(price, excluded.price), samples = samples + 1`,
+        game, p.league, day, p.price
+      );
+    }
+  }
+
+  // Attach the current league's daily history to each game
+  withHistory(data) {
+    const out = { ...data, prices: { ...data.prices } };
+    for (const [game, p] of Object.entries(out.prices)) {
+      if (!p?.league) continue;
+      const rows = this.sql.exec(
+        "SELECT day, price FROM price_history WHERE game = ? AND league = ? ORDER BY day", game, p.league
+      ).toArray();
+      out.prices[game] = { ...p, history: rows.map((r) => [r.day, Math.round(r.price * 10000) / 10000]) };
+    }
+    return out;
   }
 
   basketMap() {

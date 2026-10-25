@@ -632,3 +632,17 @@ body.hoop-on .hoop-hud { display: block; }
 .goal-big { font-family: "Graduate", serif; font-size: 17px; color: var(--text); }
 .goal-sub { font-size: 12.5px; color: var(--muted); }
 .goal-note { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+
+.goal-season { color: var(--text) !important; margin-top: 4px; }
+.goal-money { color: var(--green) !important; }
+.goal-eta { color: var(--led) !important; font-weight: 700; }
+.goal-chart { margin-top: 8px; }
+.price-chart { width: 100%; height: auto; display: block; background: #050404; border: 1px solid #2a2222; border-radius: 8px; }
+.pc-curve { fill: none; stroke: var(--led); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.pc-today { stroke: rgba(255, 255, 255, .25); stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.pc-now { fill: var(--red-2); }
+.pc-real { fill: var(--green); }
+.pc-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.pc-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin: 0 3px 0 6px; vertical-align: middle; }
+.pc-dot.now { background: var(--red-2); }
+.pc-dot.real { background: var(--green); }

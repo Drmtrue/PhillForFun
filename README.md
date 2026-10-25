@@ -90,6 +90,15 @@ The "Биржа РМТ" panel shows the cheapest price for 1 Divine Orb on FunPa
 
 Below the prices is a savings goal (`RMT_GOAL` in `config.js`: a new PC for 250 000 ₽). For each game it shows how many Divine Orbs must be sold at the current cheapest price, how many hours of farming that is at 8 Divine/hour (an above-average player: between "comfortable mapper" 3–6/h and "disciplined farmer" 10–20/h in community estimates), the same in years at 6 hours a day and non-stop, and the resulting income per hour. Sources for the rates are noted in `config.js`.
 
+### Season forecast
+
+`rmtmodel.js` turns the current price into a season-aware forecast, using the league calendar in `SEASONS` (`config.js`):
+
+- **Price curve:** `p(d) = floor · (1 + (k − 1) · e^(−d/τ))` for day `d` of the league. With fewer than 5 days of real history the shape comes from `RMT_MODEL` (k = 3, τ = 10 days, an assumption — no public RMT price history exists) and only the floor is solved from today's price; with 5+ days the server's real daily prices are fitted (grid search over k and τ, closed-form floor in log space).
+- **Stats per game:** day of season and days left, next league date, modelled launch → now → end price, drop over the season / first week / this week.
+- **Savings:** a day-by-day walk from today: farming income during leagues (`divinesPerHour × hoursPerDay × p(d)`), nothing in the gap between leagues, following leagues repeating the same rhythm and curve, until the goal is reached. Shows earnings until the end of this league, the first week of the next one, and the estimated month the PC is affordable.
+- **Data:** the Worker records the lowest online price per game, league and UTC day (`price_history`), refreshed hourly by a cron trigger, so the next leagues (PoE 1 3.30 on Nov 13, PoE 2 1.0 on Dec 11) are captured from day one.
+
 ## Free throw (second chance)
 
 After the first wrong answer to a question, the right answer stays hidden and a free-throw court opens in a modal. The player gets one throw from behind the free-throw line:
