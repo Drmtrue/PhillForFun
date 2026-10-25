@@ -1,6 +1,8 @@
 name = "phill-quiz-api"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
+workers_dev = true
+preview_urls = false
 
 # Одна база на всё: факты, вопросы, рейтинг (SQLite внутри Durable Object, есть в бесплатном плане)
 [[durable_objects.bindings]]
