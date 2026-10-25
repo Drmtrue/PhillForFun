@@ -130,20 +130,25 @@ async function fetchOne(key, cookie) {
   const leagues = parseLeagues(html);
   const offers = scanOffers(html, src.side).filter((o) => o.amount >= 1);
 
-  // Current league = the eligible league with the most Divine offers
+  // Current league = the NEWEST eligible league that already has a live market.
+  // FunPay league ids grow over time, so a new season shows up with a higher id than the old one.
+  // Picking by "most offers" would keep the old league for days after a launch, because old lots linger.
   const byLeague = new Map();
   for (const o of offers) {
     const name = leagues.get(o.server) || o.server;
     if (!src.leagueOk(name)) continue;
-    const g = byLeague.get(name) || [];
-    g.push(o);
-    byLeague.set(name, g);
+    const g = byLeague.get(o.server) || { id: Number(o.server), name, list: [] };
+    g.list.push(o);
+    byLeague.set(o.server, g);
   }
-  const main = [...byLeague.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  const ranked = [...byLeague.values()].sort((a, b) => b.id - a.id);
+  const MIN_ONLINE = 3; // a brand-new league needs a few online sellers before its price means anything
+  const main = ranked.find((g) => g.list.filter((o) => o.online).length >= MIN_ONLINE) || ranked[0];
   if (!main) throw new Error(`${key}: no offers in the current league`);
-  const [league, list] = main;
+  const { name: league, list, id: leagueId } = main;
   const online = list.filter((o) => o.online);
   const cheapest = online.length ? online.reduce((a, b) => (b.price < a.price ? b : a)) : null;
+  const newer = ranked.filter((g) => g.id > leagueId).map((g) => g.name); // spotted but not liquid yet
   return {
     game: src.title,
     url: src.url,
@@ -151,7 +156,9 @@ async function fetchOne(key, cookie) {
     price: cheapest ? cheapest.price : null,
     unit: cheapest ? cheapest.unit : list[0].unit,
     offers: list.length,
-    onlineOffers: online.length
+    onlineOffers: online.length,
+    leagueId,
+    newerLeagues: newer
   };
 }
 

@@ -675,3 +675,4 @@ body.hoop-on .hoop-hud { display: block; }
 .goal-details[open] .goal-toggle .when-open { display: inline; }
 .goal-details[open] .goal-toggle .when-closed { display: none; }
 .goal-body { padding: 0 12px 12px; animation: fade .25s ease; }
+.rmt-row.rmt-stale .rmt-num { color: var(--muted); text-shadow: none; text-decoration: line-through; }

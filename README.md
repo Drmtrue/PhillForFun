@@ -83,7 +83,7 @@ On screens wider than ~1100px a hoop appears in the empty space left or right of
 
 The "Биржа РМТ" panel shows the cheapest price for 1 Divine Orb on FunPay for PoE 1 and PoE 2 (`worker/src/prices.js`):
 
-- only the current main league (event, Standard, Hardcore and Ruthless leagues are skipped; PoE 1 uses the PC league);
+- only the current main league: event, Standard, Hardcore and Ruthless leagues are skipped (PoE 1 uses the PC league), and among the rest the **newest** league (highest FunPay league id) wins as soon as it has 3+ online sellers — so a new season replaces the old one on launch day even while old lots are still listed;
 - only offers from sellers who are online at the moment of the check;
 - prices in rubles: the server asks FunPay for ruble prices via its currency switch; if FunPay does not offer rubles for the server's location, it converts using the Central Bank of Russia daily rate and the page says so;
 - refreshed at most every 20 minutes, with a trend arrow when the price moves.
@@ -99,6 +99,7 @@ The goal block is collapsed by default to a one-line summary (goal, price and th
 - **Price curve:** `p(d) = floor · (1 + (k − 1) · e^(−d/τ))` for day `d` of the league. With fewer than 5 days of real history the shape comes from `RMT_MODEL` (k = 3, τ = 10 days, an assumption — no public RMT price history exists) and only the floor is solved from today's price; with 5+ days the server's real daily prices are fitted (grid search over k and τ, closed-form floor in log space).
 - **Stats per game:** day of season and days left, next league date, modelled launch → now → end price, drop over the season / first week / this week.
 - **Savings:** a day-by-day walk from today: farming income during leagues (`divinesPerHour × hoursPerDay × p(d)`), nothing in the gap between leagues, following leagues repeating the same rhythm and curve, until the goal is reached. Shows earnings until the end of this league, the first week of the next one, and the estimated month the PC is affordable.
+- **Season switch-over:** `resolveSeason()` compares the league the server is pricing with the calendar. Phases: `live`; `ended` (league over, next not launched — prices are marked stale and earn nothing); `waiting` (next league launched but FunPay has too few online sellers). If a newer league is priced while the calendar still points at the old one, dates roll forward automatically (launch = announced date, or when the server first saw the league if that was clearly earlier) and are labelled as estimated. History is kept per league name and the fit ignores days outside the league, so old-season prices never leak into a new season.
 - **Data:** the Worker records the lowest online price per game, league and UTC day (`price_history`), refreshed hourly by a cron trigger, so the next leagues (PoE 1 3.30 on Nov 13, PoE 2 1.0 on Dec 11) are captured from day one.
 
 ## Free throw (second chance)

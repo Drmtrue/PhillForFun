@@ -1,7 +1,7 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251419";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, MIN_POINTS } from "./rmtmodel.js?v=202610251419";
-import { initHoop } from "./hoop.js?v=202610251419";
-import { freeThrow } from "./freethrow.js?v=202610251419";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251426";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251426";
+import { initHoop } from "./hoop.js?v=202610251426";
+import { freeThrow } from "./freethrow.js?v=202610251426";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -962,7 +962,9 @@ async function loadPrices() {
       const b = document.createElement("b");
       b.textContent = r.short;
       const lg = document.createElement("span");
-      lg.textContent = r.league.replace(/^\(PC\)\s*/, "");
+      const phase = resolveSeason(SEASONS[r.short === "PoE 1" ? "poe1" : "poe2"], r.league, r.firstSeen).phase;
+      lg.textContent = r.league.replace(/^\(PC\)\s*/, "") + (phase === "live" ? "" : " · лига завершена");
+      if (phase !== "live") a.classList.add("rmt-stale");
       const on = document.createElement("span");
       on.className = "rmt-online";
       on.textContent = `продавцов онлайн: ${r.onlineOffers} из ${r.offers}`;
@@ -1081,7 +1083,7 @@ function renderGoal(rows) {
   let anyEstimate = false;
   for (const r of priced) {
     const key = r.short === "PoE 1" ? "poe1" : "poe2";
-    const season = SEASONS[key];
+    const season = resolveSeason(SEASONS[key], r.league, r.firstSeen);
     const rate = RMT_GOAL.divinesPerHour[key];
     const need = Math.ceil(RMT_GOAL.priceRub / r.price);
     const sd = seasonDay(season);
@@ -1100,9 +1102,12 @@ function renderGoal(rows) {
     big.textContent = `${fmtInt(need)} Divine`;
     d.append(big);
 
-    const seasonText = sd.left > 0
-      ? `Сезон: день ${Math.floor(sd.day) + 1} из ${Math.round(sd.length)} · до конца ${days(sd.left)} · ${season.nextName} — ${fmtDate(Date.parse(season.next))}`
-      : `Сезон закончился · ${season.nextName} — ${fmtDate(Date.parse(season.next))}`;
+    const nextText = `${season.nextName} — ${fmtDate(Date.parse(season.next))}`;
+    const seasonText =
+      season.phase === "ended" ? `Лига закончилась, цены уже неактуальны · ${nextText} (через ${days(sd.nextIn)})`
+      : season.phase === "waiting" ? `${season.nextName} уже стартовал, ждём продавцов на FunPay · пока показаны цены прошлой лиги`
+      : `Сезон «${season.league.replace(/^\(PC\)\s*/, "")}»: день ${Math.floor(sd.day) + 1} из ${Math.round(sd.length)} · до конца ${days(sd.left)} · ${nextText}` +
+        (season.estimated ? " (даты оценочные)" : "");
     const lines = [
       [`по сегодняшней цене, ≈ ${fmtInt(need / rate)} ч фарма`, ""],
       [seasonText, "goal-season"],

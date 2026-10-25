@@ -241,6 +241,12 @@ export class QuizStore extends DurableObject {
           samples INTEGER NOT NULL DEFAULT 1,
           PRIMARY KEY (game, league, day)
         )`,
+      `CREATE TABLE IF NOT EXISTS league_seen (
+          game TEXT NOT NULL,
+          league TEXT NOT NULL,
+          first_seen TEXT NOT NULL,
+          PRIMARY KEY (game, league)
+        )`,
       `CREATE TABLE IF NOT EXISTS baskets (
           name_key TEXT PRIMARY KEY,
           count INTEGER NOT NULL DEFAULT 0,
@@ -412,9 +418,13 @@ export class QuizStore extends DurableObject {
 
   // One row per game, league and UTC day: the lowest online price seen that day
   recordHistory(prices) {
-    const day = new Date().toISOString().slice(0, 10);
+    const now = new Date().toISOString();
+    const day = now.slice(0, 10);
     for (const [game, p] of Object.entries(prices || {})) {
-      if (!p || p.stale || p.price == null || !p.league) continue;
+      if (!p || p.stale || !p.league) continue;
+      // Remember when each league first appeared: the real launch moment if the calendar is out of date
+      this.sql.exec("INSERT OR IGNORE INTO league_seen (game, league, first_seen) VALUES (?, ?, ?)", game, p.league, now);
+      if (p.price == null) continue;
       this.sql.exec(
         `INSERT INTO price_history (game, league, day, price, samples) VALUES (?, ?, ?, ?, 1)
          ON CONFLICT(game, league, day) DO UPDATE SET price = MIN(price, excluded.price), samples = samples + 1`,
@@ -431,7 +441,8 @@ export class QuizStore extends DurableObject {
       const rows = this.sql.exec(
         "SELECT day, price FROM price_history WHERE game = ? AND league = ? ORDER BY day", game, p.league
       ).toArray();
-      out.prices[game] = { ...p, history: rows.map((r) => [r.day, Math.round(r.price * 10000) / 10000]) };
+      const seen = this.sql.exec("SELECT first_seen FROM league_seen WHERE game = ? AND league = ?", game, p.league).toArray()[0];
+      out.prices[game] = { ...p, firstSeen: seen?.first_seen || null, history: rows.map((r) => [r.day, Math.round(r.price * 10000) / 10000]) };
     }
     return out;
   }

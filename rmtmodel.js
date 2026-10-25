@@ -25,12 +25,46 @@ export function seasonDay(season, now = Date.now()) {
   };
 }
 
+const normLeague = (x) => String(x || "").replace(/^\((PC|PS|Xbox)\)\s*/i, "").trim().toLowerCase();
+
+// Works out which season the prices belong to, so a new league never gets mixed with the old one.
+// cfg: the calendar entry from config.js; detected: league name the server is pricing; firstSeen: ISO time
+// the server first saw that league. Phases:
+//   live    – the priced league is running
+//   ended   – the configured league is over, the next one has not launched yet (prices are stale)
+//   waiting – the next league has launched but FunPay has too few online sellers yet
+// estimated = true when the calendar is out of date and dates were derived automatically.
+export function resolveSeason(cfg, detected, firstSeen, now = Date.now()) {
+  const start = Date.parse(cfg.start), end = Date.parse(cfg.end), next = Date.parse(cfg.next || cfg.end);
+  const length = end - start, gap = Math.max(0, next - end);
+  const isConfigured = !detected || normLeague(detected) === normLeague(cfg.league);
+
+  if (isConfigured) {
+    const phase = now < end ? "live" : now < next ? "ended" : "waiting";
+    return { ...cfg, league: detected || cfg.league, phase, estimated: false };
+  }
+
+  // A different (newer) league is being priced: the calendar is out of date, roll it forward.
+  // Prefer the announced launch date; if the league appeared well before it, trust when we first saw it.
+  const seen = firstSeen ? Date.parse(firstSeen) : now;
+  const launch = seen < next - DAY * 2 ? seen : Math.min(next, seen);
+  return {
+    league: detected,
+    start: new Date(launch).toISOString(),
+    end: new Date(launch + length).toISOString(),
+    next: new Date(launch + length + gap).toISOString(),
+    nextName: "следующий сезон",
+    phase: "live",
+    estimated: true
+  };
+}
+
 // history: [[ "YYYY-MM-DD", price ], ...] for the current league
 export function calibrate(season, todayPrice, history, defaults, now = Date.now()) {
   const start = Date.parse(season.start);
   const points = (history || [])
     .map(([day, price]) => [(Date.parse(day + "T12:00:00Z") - start) / DAY, price])
-    .filter(([d, p]) => d >= 0 && p > 0);
+    .filter(([d, p]) => d >= 0 && p > 0 && d <= (Date.parse(season.end) - start) / DAY + 1); // only this league's days
 
   if (points.length >= MIN_POINTS) {
     // Grid search over the shape; the floor has a closed form in log space for each shape
