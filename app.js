@@ -576,25 +576,106 @@ clicks($("smoke"), 5, 2500, () => {
   setTimeout(() => puff.remove(), 1200);
 });
 
-// 3. Bath bubbles: pop ten
+// 3. Bath bubbles: pop ten (with a splash and a "plop")
+const SOUND_KEY = "phill_quiz_sound";
+let soundOn = store.get(SOUND_KEY, true);
+let audioCtx = null;
+
+// Synthesized pop: a quick pitch-dropping blip plus a tiny filtered click. No audio files needed.
+function popSound(size) {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const t = audioCtx.currentTime;
+    const base = Math.max(260, 980 - size * 18) * (0.9 + Math.random() * 0.2); // bigger bubble = lower pop
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(base * 1.8, t);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.45, t + 0.09);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.32, t + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.14);
+
+    const len = Math.floor(audioCtx.sampleRate * 0.025);
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buf;
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 2500;
+    const ng = audioCtx.createGain();
+    ng.gain.value = 0.18;
+    noise.connect(hp).connect(ng).connect(audioCtx.destination);
+    noise.start(t);
+  } catch (_) { /* audio is optional */ }
+}
+
+function splash(x, y, size) {
+  const burst = document.createElement("div");
+  burst.className = "burst";
+  burst.style.left = `${x}px`;
+  burst.style.top = `${y}px`;
+  burst.style.width = burst.style.height = `${size}px`;
+  burst.style.setProperty("--d", `${size * 1.3 + 26}px`);
+  const ring = document.createElement("span");
+  ring.className = "ring";
+  burst.append(ring);
+  const drops = 8 + Math.round(size / 8);
+  for (let i = 0; i < drops; i++) {
+    const d = document.createElement("span");
+    d.className = "drop";
+    d.style.setProperty("--a", `${(360 / drops) * i + Math.random() * 20}deg`);
+    d.style.animationDuration = `${0.35 + Math.random() * 0.25}s`;
+    burst.append(d);
+  }
+  document.body.append(burst);
+  setTimeout(() => burst.remove(), 700);
+}
+
 let popped = 0;
 document.querySelectorAll(".bubbles i").forEach((b) => {
-  b.addEventListener("click", () => {
-    if (b.classList.contains("pop")) return;
-    b.classList.add("pop");
+  b.addEventListener("pointerdown", (e) => {
+    e.preventDefault(); // no text selection, no focus jump
+    if (b.dataset.popped) return;
+    const r = b.getBoundingClientRect();
+    b.dataset.popped = "1";
+    b.style.visibility = "hidden";
+    splash(r.left + r.width / 2, r.top + r.height / 2, r.width);
+    popSound(r.width);
     popped++;
+    // Respawn the bubble from the bottom after a moment
     setTimeout(() => {
-      b.classList.remove("pop");
       b.style.animation = "none";
       void b.offsetWidth;
       b.style.animation = "";
-    }, 450);
+      b.style.visibility = "";
+      delete b.dataset.popped;
+    }, 600);
     if (popped === 10) {
       toast("🛁 Буль!", "Фил бы не одобрил: пена — это святое.");
       unlock("bubbles");
     }
   });
 });
+
+function renderSoundBtn() {
+  $("sound-btn").textContent = soundOn ? "🔊 звук вкл" : "🔇 звук выкл";
+}
+$("sound-btn").addEventListener("click", () => {
+  soundOn = !soundOn;
+  store.set(SOUND_KEY, soundOn);
+  renderSoundBtn();
+  if (soundOn) popSound(20);
+});
+renderSoundBtn();
 
 // 4. Scoreboard ball: 23 dribbles
 let dribbles = 0;

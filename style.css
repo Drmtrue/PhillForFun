@@ -28,7 +28,12 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overflow-x: hidden;
+  /* Clicking around (bubbles, eggs, answers) should never paint blue selections */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+input, textarea { -webkit-user-select: text; user-select: text; }
 
 /* ---------- Background ---------- */
 .court {
@@ -43,8 +48,6 @@ body {
 .bubbles { position: fixed; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
 .bubbles i { pointer-events: auto; cursor: pointer; }
 body.playing .bubbles i { pointer-events: none; }
-.bubbles i.pop { animation: pop-bubble .45s ease-out forwards !important; }
-@keyframes pop-bubble { to { transform: scale(2.2); opacity: 0; } }
 .bubbles i {
   position: absolute;
   bottom: -60px;
@@ -533,3 +536,25 @@ body.spicy::after {
 .scheme .links line { stroke: currentColor; stroke-width: 2; }
 .scheme .you circle { fill: var(--led); animation: pulse 1.2s ease-in-out infinite; }
 .scheme .you text { fill: var(--led); font: 700 12px "Graduate", serif; }
+
+/* Bubble pop splash */
+.burst { position: fixed; z-index: 3; pointer-events: none; transform: translate(-50%, -50%); }
+.burst .ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid rgba(215, 238, 255, .95);
+  box-shadow: 0 0 16px rgba(170, 215, 255, .7), inset 0 0 10px rgba(170, 215, 255, .5);
+  animation: burst-ring .35s ease-out forwards;
+}
+@keyframes burst-ring { 0% { transform: scale(.9); opacity: 1; } 100% { transform: scale(2.4); opacity: 0; border-width: 0; } }
+.burst .drop {
+  position: absolute; left: 50%; top: 50%;
+  width: 7px; height: 7px; margin: -3.5px;
+  box-shadow: 0 0 6px rgba(190, 225, 255, .9);
+  border-radius: 50%;
+  background: rgba(215, 238, 255, .95);
+  transform: rotate(var(--a)) translateY(0);
+  animation: burst-drop .45s cubic-bezier(.2, .7, .4, 1) forwards;
+}
+@keyframes burst-drop {
+  to { transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.2); opacity: 0; }
+}
