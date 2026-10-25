@@ -729,3 +729,26 @@ body.hoop-on .hoop-hud { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .phil-av *, .phil-av { animation: none !important; transition: none !important; }
 }
+
+/* 3D walking Phil */
+.phil-av.phil-3d { display: block; left: 0; right: auto; bottom: -10px; will-change: transform; }
+.phil-3d .phil-canvas { display: block; pointer-events: none; }
+.phil-3d .phil-hit {
+  position: absolute; left: 28%; width: 44%; top: 22%; height: 72%;
+  pointer-events: auto; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 40%;
+}
+.phil-3d .phil-hit:focus-visible { outline: 2px solid var(--led, #ffb02e); outline-offset: 2px; }
+.phil-3d .phil-bubble {
+  position: absolute; margin: 0; width: max-content; max-width: 240px;
+  border-radius: 14px; transform: none;
+}
+.phil-3d .phil-bubble::after {
+  right: auto; left: var(--tail, 50%); bottom: -9px; margin-left: -8px;
+  border: 8px solid transparent; border-top-color: #1b0d07; border-bottom: 0;
+}
+.phil-3d .phil-bubble.pop { animation: bubble-pop-3d .32s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes bubble-pop-3d { from { scale: .4; opacity: 0; } to { scale: 1; opacity: 1; } }
+@media (max-width: 640px) {
+  .phil-av.phil-3d { left: 0; right: auto; bottom: -8px; }
+  .phil-3d .phil-bubble { max-width: min(220px, calc(100vw - 24px)); margin: 0; }
+}

@@ -1,5 +1,6 @@
-// Anime-style Phil in the bottom-right corner. He reacts to game events with a speech bubble
-// and now and then lights a cigarette (his signature move).
+// Phil the mascot: a 3D cartoon Phil who walks along the bottom of the screen (phil3d.js), with a flat
+// anime-style SVG badge as the fallback. He reacts to game events with a speech bubble and now and
+// then lights a cigarette (his signature move).
 // Usage: const phil = initAvatar(); phil.say("wrong");
 
 // Each event has several lines; a line picked at random (never the same one twice in a row).
@@ -232,18 +233,37 @@ const SVG = `
   </g>
 </svg>`;
 
+// Body movement per event for the 3D Phil (falls back to the event's mood)
+const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug" };
+
 export function initAvatar() {
   const root = document.createElement("div");
   root.className = "phil-av";
   root.dataset.mood = "neutral";
-  root.innerHTML = `
-    <div class="phil-bubble" role="status" aria-live="polite" hidden></div>
-    <button type="button" class="phil-face" title="Фил">${SVG}</button>`;
+  root.innerHTML = `<div class="phil-bubble" role="status" aria-live="polite" hidden></div>`;
   document.body.append(root);
   const bubble = root.querySelector(".phil-bubble");
 
+  let body3d = null;           // the walking 3D Phil, once Three.js has loaded
   let hideTimer = null, moodTimer = null, current = null, lastSaid = 0;
   let smoking = false, smokeTimers = [];
+
+  // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
+  import("./phil3d.js?v=202610251450")
+    .then(({ createPhil3D }) => {
+      body3d = createPhil3D(root, { bubble, onClick: () => say("click", { force: true }) });
+      root.classList.add("phil-3d");
+    })
+    .catch((e) => {
+      console.warn("3D Phil unavailable, using the flat avatar", e);
+      const face = document.createElement("button");
+      face.type = "button";
+      face.className = "phil-face";
+      face.title = "Фил";
+      face.innerHTML = SVG;
+      face.addEventListener("click", () => say("click", { force: true }));
+      root.append(face);
+    });
 
   function setMood(mood) {
     root.dataset.mood = mood === "random" ? MOODS[Math.floor(Math.random() * MOODS.length)] : mood;
@@ -252,6 +272,7 @@ export function initAvatar() {
   }
 
   function smoke() {
+    if (body3d) { body3d.smoke(); return; }
     if (smoking) return;
     smoking = true;
     smokeTimers.forEach(clearTimeout);
@@ -269,6 +290,7 @@ export function initAvatar() {
       root.dataset.mood = "neutral";
     });
   }
+  const isSmoking = () => (body3d ? body3d.smoking : smoking);
 
   // Shows a line for an event. Lower-priority events do not interrupt a more important line,
   // and minor events are rate-limited so Phil does not talk over every click.
@@ -290,33 +312,39 @@ export function initAvatar() {
     bubble.classList.remove("pop");
     void bubble.offsetWidth;
     bubble.classList.add("pop");
-    root.classList.remove("bob");
-    void root.offsetWidth;
-    root.classList.add("bob");
-    if (!smoking) setMood(ev.mood);
+    if (body3d) {
+      let act = ACTS[key] || ev.mood;
+      if (Array.isArray(act)) act = act[Math.floor(Math.random() * act.length)];
+      if (!(line.smoke && !isSmoking())) body3d.react(act);
+    } else {
+      root.classList.remove("bob");
+      void root.offsetWidth;
+      root.classList.add("bob");
+      if (!smoking) setMood(ev.mood);
+    }
     if (line.smoke) setTimeout(smoke, 400);
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => { bubble.hidden = true; current = null; }, Math.max(3200, line.t.length * 70));
   }
 
-  root.querySelector(".phil-face").addEventListener("click", () => say("click", { force: true }));
-
   // A smoke break every so often, his signature move
   (function scheduleSmoke() {
     setTimeout(() => {
-      if (!document.hidden && bubble.hidden && !smoking) {
+      if (!document.hidden && bubble.hidden && !isSmoking()) {
         smoke();
         setTimeout(() => say("smoke"), 2600);
       }
       scheduleSmoke();
-    }, 35000 + Math.random() * 45000);
+    }, 30000 + Math.random() * 40000);
   })();
 
-  // Light blinking
+  // Light blinking for the flat avatar (the 3D one blinks by itself)
   (function blink() {
     setTimeout(() => {
-      root.classList.add("blink");
-      setTimeout(() => root.classList.remove("blink"), 140);
+      if (!body3d) {
+        root.classList.add("blink");
+        setTimeout(() => root.classList.remove("blink"), 140);
+      }
       blink();
     }, 2500 + Math.random() * 4000);
   })();
