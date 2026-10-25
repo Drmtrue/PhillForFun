@@ -1,6 +1,6 @@
-import { QUIZ, API_URL } from "./config.js?v=202610251230";
-import { initHoop } from "./hoop.js?v=202610251230";
-import { freeThrow } from "./freethrow.js?v=202610251230";
+import { QUIZ, API_URL } from "./config.js?v=202610251313";
+import { initHoop } from "./hoop.js?v=202610251313";
+import { freeThrow } from "./freethrow.js?v=202610251313";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -485,6 +485,7 @@ function pick(btn, text) {
   if (!right && WORK_WORDS.test(text)) unlock("workaholic");
   if (right && /аджик/i.test(cur.q + " " + cur.correct)) unlock("adjika");
   if (right && cur.freeThrowMade) unlock("ft_saved");
+  if (!right && cur.freeThrowMade) unlock("ft_choke");
 
   right ? sfx.swish() : sfx.brick();
   $("live-score").textContent = game.score;
@@ -499,9 +500,23 @@ function pick(btn, text) {
     document.querySelectorAll(".answer").forEach((b) => (b.disabled = true));
     $("call").textContent = "Промах! На линию штрафного…";
     setTimeout(async () => {
-      const made = await freeThrow({ sound: playCourtSound });
+      const FT_LIVE = { forgot: "ft_forgot", nudge: "ft_nudge", wrongway: "ft_wrongway", down: "ft_floor" };
+      const res = await freeThrow({ sound: playCourtSound, onEvent: (name) => FT_LIVE[name] && unlock(FT_LIVE[name]) });
+      const made = res.made;
+      const st = res.stats;
       cur.busy = false;
       game.freeThrows = (game.freeThrows || 0) + 1;
+      if (made) game.ftMade = (game.ftMade || 0) + 1;
+      else if (!res.skipped) game.ftMissed = (game.ftMissed || 0) + 1;
+      if (res.skipped) unlock("ft_skip");
+      if (made && !st.board && st.rimHits === 0) unlock("ft_swish");
+      if (made && st.board) unlock("ft_bank");
+      if (made && st.rimHits >= 2) unlock("ft_lucky");
+      if (!made && !res.skipped && !st.board && st.rimHits === 0 && !st.down) unlock("ft_airball");
+      if (!made && st.rimHits >= 3) unlock("ft_rimout");
+      if (st.moonshot) unlock("ft_moon");
+      if ((game.ftMade || 0) >= 3) unlock("ft_three");
+      if ((game.ftMissed || 0) >= 3) unlock("ft_shaq");
       if (made) {
         cur.freeThrowMade = true;
         unlock("ft_made");

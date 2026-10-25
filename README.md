@@ -93,4 +93,4 @@ After the first wrong answer to a question, the right answer stays hidden and a 
 - make it → the wrong option stays crossed out and the player answers the same question again (a right answer still earns the point);
 - miss it (or press "Не бросать") → the right answer is revealed and the game moves on.
 
-Only one free throw per question. Achievements: "Штрафной реализован" (made a free throw) and "Спасён с линии" (made it and then answered correctly).
+Only one free throw per question. `freeThrow()` resolves to `{ made, skipped, stats }` (rim hits, backboard, highest point, odd throws), and live events (`forgot`, `nudge`, `wrongway`, `down`) fire while the modal is open. These drive 16 free-throw achievements: made / saved / choked, swish, bank shot, lucky rim roll, rim-out, airball, 3 made or 3 missed in one game, skipped, plus secret ones for forgetting to throw, throwing the wrong way, into the floor, off the screen, or too weakly.

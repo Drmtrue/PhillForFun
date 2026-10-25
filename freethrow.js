@@ -1,6 +1,7 @@
 // Free throw after a wrong answer: a small court in a modal, one throw.
-// Resolves to true if the ball goes in. The ball can only be held behind the free-throw line,
-// so the shot has to be a real throw (no dunks).
+// Resolves to { made, skipped, stats } where stats describe how the shot went (for achievements).
+// The ball can only be held behind the free-throw line, so the shot has to be a real throw (no dunks).
+// onEvent(name) fires live for things that happen before the result: "forgot", "nudge", "wrongway", "down".
 
 const R = 16;            // ball radius
 const RIM_W = 78;        // distance between rim edges
@@ -8,7 +9,7 @@ const RIM_DOT = 3;
 const GRAVITY = 1700;
 const MAX_SPEED = 2300;
 
-export function freeThrow({ sound } = {}) {
+export function freeThrow({ sound, onEvent } = {}) {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "overlay ft-overlay";
@@ -51,6 +52,14 @@ export function freeThrow({ sound } = {}) {
     let netWobble = 0;
     let finished = false;
     let last = performance.now();
+    const stats = { rimHits: 0, board: false, minY: Infinity, nudges: 0, wrongWay: false, down: false, forgot: false };
+    let lastRimAt = 0;
+    const emit = (name) => onEvent && onEvent(name);
+
+    // Standing there without throwing for 15 seconds
+    const forgotTimer = setTimeout(() => {
+      if (!shot && !finished) { stats.forgot = true; emit("forgot"); }
+    }, 15000);
 
     const local = (e) => {
       const r = canvas.getBoundingClientRect();
@@ -87,27 +96,38 @@ export function freeThrow({ sound } = {}) {
       const dt = Math.max(0.016, (b.t - a.t) / 1000);
       let vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt;
       const sp = Math.hypot(vx, vy);
-      if (sp < 120) { ball.state = "rest"; return; } // just a nudge, not a throw
+      if (sp < 120) { // just a nudge, not a throw
+        ball.state = "rest";
+        stats.nudges++;
+        if (stats.nudges === 3) emit("nudge");
+        return;
+      }
       if (sp > MAX_SPEED) { vx *= MAX_SPEED / sp; vy *= MAX_SPEED / sp; }
       ball.vx = vx;
       ball.vy = vy;
       ball.state = "flight";
       shot = { t0: now, scored: false, done: false };
+      clearTimeout(forgotTimer);
+      // Odd throws: away from the hoop, or straight into the floor
+      const toHoop = hoop.x + RIM_W / 2 - ball.x;
+      if (Math.abs(vx) > 250 && Math.abs(toHoop) > 30 && Math.sign(vx) !== Math.sign(toHoop)) { stats.wrongWay = true; emit("wrongway"); }
+      if (vy > 150) { stats.down = true; emit("down"); }
     };
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
 
-    function finish(made) {
+    function finish(made, skipped = false) {
       if (finished) return;
       finished = true;
+      clearTimeout(forgotTimer);
       resultEl.textContent = made ? "Попал! Ещё одна попытка ответа." : "Мимо. Идём дальше.";
       resultEl.className = "ft-result " + (made ? "ok" : "bad");
       setTimeout(() => {
         overlay.remove();
-        resolve(made);
+        resolve({ made, skipped, stats: { ...stats, moonshot: stats.minY < -150 } });
       }, made ? 1100 : 1300);
     }
-    overlay.querySelector(".ft-skip").addEventListener("click", () => finish(false));
+    overlay.querySelector(".ft-skip").addEventListener("click", () => finish(false, true));
 
     function collide(px, py) {
       const dx = ball.x - px, dy = ball.y - py, d = Math.hypot(dx, dy), min = R + RIM_DOT;
@@ -133,10 +153,16 @@ export function freeThrow({ sound } = {}) {
       const top = hoop.y - 70, bottom = hoop.y + 14;
       if (ball.y + R > top && ball.y - R < bottom) {
         const bx = hoop.boardX;
-        if (side === "left" && ball.x - R < bx && ball.x > bx - 6) { ball.x = bx + R; ball.vx = Math.abs(ball.vx) * 0.55; }
-        if (side === "right" && ball.x + R > bx && ball.x < bx + 6) { ball.x = bx - R; ball.vx = -Math.abs(ball.vx) * 0.55; }
+        if (side === "left" && ball.x - R < bx && ball.x > bx - 6) { ball.x = bx + R; ball.vx = Math.abs(ball.vx) * 0.55; stats.board = true; }
+        if (side === "right" && ball.x + R > bx && ball.x < bx + 6) { ball.x = bx - R; ball.vx = -Math.abs(ball.vx) * 0.55; stats.board = true; }
       }
-      if ((collide(hoop.x, hoop.y) || collide(hoop.x + RIM_W, hoop.y)) && sound) sound("rim");
+      if (collide(hoop.x, hoop.y) || collide(hoop.x + RIM_W, hoop.y)) {
+        const now = performance.now();
+        if (now - lastRimAt > 90) stats.rimHits++; // count separate touches, not every sub-step
+        lastRimAt = now;
+        if (sound) sound("rim");
+      }
+      stats.minY = Math.min(stats.minY, ball.y);
 
       if (!shot.scored && prevY < hoop.y && ball.y >= hoop.y && ball.vy > 0 &&
           ball.x > hoop.x + 4 && ball.x < hoop.x + RIM_W - 4) {
