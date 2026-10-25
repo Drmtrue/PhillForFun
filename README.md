@@ -13,6 +13,7 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 | Site | `index.html`, `style.css`, `app.js`, `config.js` | Static front end, hosted on GitHub Pages |
 | Built-in questions | `questions.js` | The starting question pool |
 | Achievements | `achievements.js` | Achievement catalogue (unlock logic and easter eggs live in `app.js`) |
+| Side-court mini-game | `hoop.js` | Drag-and-throw basketball in the free space beside the quiz (wide screens only) |
 | Server | `worker/` | Cloudflare Worker: takes facts, generates and moderates questions with Root AI - model b1t quiz v1.1, stores questions and scores |
 | Admin | `admin.html` | Review and delete player-generated questions, browse submitted facts |
 
@@ -43,7 +44,8 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | --- | --- | --- |
 | `GET` | `/questions` | Player-generated questions |
 | `GET` | `/scores` | Leaderboard: attempts, total points, average and achievement count per player, sorted by average |
-| `GET` | `/player?name=` | One player's attempts, points and average |
+| `GET` | `/player?name=` | One player's attempts, points, average and side-court baskets |
+| `POST` | `/baskets` | Add side-court baskets `{ name, add }` (counted separately from quiz points) |
 | `GET` | `/achievements?name=` | Achievement ids unlocked by a player |
 | `POST` | `/achievements` | Unlock achievements `{ name, ids: [...] }` |
 | `POST` | `/scores` | Save a result `{ name, score, total }` |
@@ -68,3 +70,7 @@ Answers are shuffled automatically, so always put the right one in `correct`.
 ## Achievements
 
 Defined in `achievements.js` (`id`, `icon`, `title`, `desc`, optional `secret` + `hint` for easter eggs). To add one, append an entry and call `unlock("<id>")` from `app.js` where it should trigger. Unlocks are cached in the browser and synced to the server per player name, so they follow the player across devices.
+
+## Side-court mini-game
+
+On screens wider than ~1100px a hoop appears in the empty space left or right of the quiz. The ball lies at the bottom of the viewport; drag it with the mouse (or finger) and release to throw. A basket adds one point to a separate counter (top-left HUD, leaderboard 🏀), and the hoop moves to a new random spot after every throw. Releasing the ball above the rim is a dunk and does not count. Add `?debug` to the URL to expose `window.__hoop` for automated checks.

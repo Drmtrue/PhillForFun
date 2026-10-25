@@ -58,6 +58,18 @@ export default {
         return json(await store.playerStats(name));
       }
 
+      // Side-court baskets (counted separately from quiz points)
+      if (path === "/baskets" && request.method === "POST") {
+        const body = await request.json().catch(() => ({}));
+        const name = clean(body.name, 30);
+        const add = Number(body.add ?? 1);
+        if (!name || !Number.isInteger(add) || add < 1 || add > 50) return json({ error: "Некорректный бросок" }, 400);
+        if (!(await store.allow(ip, "basket", 400, 3600))) {
+          return json({ error: "Слишком много бросков. Даже MJ отдыхал." }, 429);
+        }
+        return json({ baskets: await store.addBaskets(name, add) });
+      }
+
       // Achievements (per player name)
       if (path === "/achievements" && request.method === "GET") {
         const name = clean(url.searchParams.get("name"), 30);
@@ -170,6 +182,11 @@ export class QuizStore extends DurableObject {
           ts INTEGER NOT NULL
         )`,
       `CREATE INDEX IF NOT EXISTS hits_idx ON hits (key, kind, ts)`,
+      `CREATE TABLE IF NOT EXISTS baskets (
+          name_key TEXT PRIMARY KEY,
+          count INTEGER NOT NULL DEFAULT 0,
+          updated_at INTEGER NOT NULL
+        )`,
       `CREATE TABLE IF NOT EXISTS achievements (
           name_key TEXT NOT NULL,
           ach_id TEXT NOT NULL,
@@ -268,16 +285,33 @@ export class QuizStore extends DurableObject {
     const ach = new Map(
       this.sql.exec("SELECT name_key AS k, COUNT(*) AS n FROM achievements GROUP BY name_key").toArray().map((r) => [r.k, r.n])
     );
+    const baskets = this.basketMap();
     return [...this.playerTotals().entries()]
-      .map(([k, p]) => ({ ...p, avg: Math.round((p.points / p.attempts) * 10) / 10, achievements: ach.get(k) || 0 }))
+      .map(([k, p]) => ({ ...p, avg: Math.round((p.points / p.attempts) * 10) / 10, achievements: ach.get(k) || 0, baskets: baskets.get(k) || 0 }))
       .sort((a, b) => b.points / b.attempts - a.points / a.attempts || b.attempts - a.attempts || a.firstAt - b.firstAt)
       .slice(0, limit);
   }
 
   playerStats(name) {
-    const p = this.playerTotals().get(name.trim().toLowerCase());
-    if (!p) return { attempts: 0, points: 0, avg: 0 };
-    return { attempts: p.attempts, points: p.points, avg: Math.round((p.points / p.attempts) * 10) / 10 };
+    const k = name.trim().toLowerCase();
+    const p = this.playerTotals().get(k);
+    const baskets = this.basketMap().get(k) || 0;
+    if (!p) return { attempts: 0, points: 0, avg: 0, baskets };
+    return { attempts: p.attempts, points: p.points, avg: Math.round((p.points / p.attempts) * 10) / 10, baskets };
+  }
+
+  basketMap() {
+    return new Map(this.sql.exec("SELECT name_key AS k, count FROM baskets").toArray().map((r) => [r.k, r.count]));
+  }
+
+  addBaskets(name, add) {
+    const k = name.trim().toLowerCase();
+    this.sql.exec(
+      `INSERT INTO baskets (name_key, count, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(name_key) DO UPDATE SET count = count + excluded.count, updated_at = excluded.updated_at`,
+      k, add, Date.now()
+    );
+    return this.sql.exec("SELECT count FROM baskets WHERE name_key = ?", k).one().count;
   }
 
   listAchievements(name) {

@@ -1,4 +1,5 @@
-import { QUIZ, API_URL } from "./config.js?v=202610251144";
+import { QUIZ, API_URL } from "./config.js?v=202610251154";
+import { initHoop } from "./hoop.js?v=202610251154";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -119,6 +120,7 @@ async function renderBoard(el) {
         `${r.points} ${plural(r.points, "очко", "очка", "очков")}`
       ];
       if (r.achievements) parts.push(`🏆 ${r.achievements}`);
+      if (r.baskets) parts.push(`🏀 ${r.baskets}`);
       meta.textContent = parts.join(" · ");
       who.append(n, meta);
 
@@ -164,6 +166,7 @@ async function syncAch(name) {
   if (name) store.set(achStoreKey(""), []);
   saveLocalAch();
   renderAch();
+  await syncBaskets(name);
 }
 
 function unlock(id) {
@@ -268,6 +271,22 @@ function noise(ac, { start = 0, dur = 0.1, type = "highpass", freq = 2000, to = 
 }
 
 const sfx = {
+  // Ball hits the rim: short metallic clank (throttled, contacts repeat across sub-steps)
+  rim() {
+    const now = performance.now();
+    if (now - (sfx._rimAt || 0) < 120) return;
+    sfx._rimAt = now;
+    const ac = ctx(); if (!ac) return;
+    tone(ac, { freq: 1150, to: 980, dur: 0.12, type: "triangle", vol: 0.09 });
+    tone(ac, { freq: 1730, dur: 0.08, type: "sine", vol: 0.05 });
+  },
+  // Ball bounces on the floor: low thump, louder for harder bounces
+  bounce(power = 0.5) {
+    const ac = ctx(); if (!ac) return;
+    tone(ac, { freq: 120, to: 60, dur: 0.12, vol: 0.12 + power * 0.25 });
+    noise(ac, { dur: 0.04, type: "lowpass", freq: 700, vol: 0.08 + power * 0.12 });
+  },
+
   // Bubble "plop": bigger bubble = lower pitch
   pop(size) {
     const ac = ctx(); if (!ac) return;
@@ -856,11 +875,64 @@ function bumpIdle() {
 }
 ["mousemove", "pointerdown", "scroll", "touchstart"].forEach((ev) => document.addEventListener(ev, bumpIdle, { passive: true }));
 
+/* ---------- Side-court baskets (separate from quiz points) ---------- */
+const BASKET_KEY = "phill_quiz_baskets";
+let baskets = 0;
+const basketKey = (name) => `${BASKET_KEY}:${nameKey(name) || "_anon"}`;
+
+function renderBaskets() {
+  $("hoop-count").textContent = baskets;
+}
+
+async function syncBaskets(name) {
+  baskets = store.get(basketKey(name), 0);
+  if (API && name) {
+    try {
+      // Baskets made before entering a name are added to that name once
+      const anon = store.get(basketKey(""), 0);
+      if (anon > 0) {
+        await api("/baskets", { method: "POST", body: JSON.stringify({ name, add: Math.min(50, anon) }) });
+        store.set(basketKey(""), 0);
+      }
+      const stats = await api(`/player?name=${encodeURIComponent(name)}`);
+      baskets = stats.baskets || 0;
+      store.set(basketKey(name), baskets);
+    } catch (e) { console.error(e); }
+  }
+  renderBaskets();
+}
+
+function scoredBasket() {
+  const name = getName();
+  baskets++;
+  store.set(basketKey(name), baskets);
+  renderBaskets();
+  $("hoop-hud").classList.remove("bump");
+  void $("hoop-hud").offsetWidth;
+  $("hoop-hud").classList.add("bump");
+  sfx.swish();
+  if (API && name) {
+    api("/baskets", { method: "POST", body: JSON.stringify({ name, add: 1 }) })
+      .then((r) => { baskets = Math.max(baskets, r.baskets); store.set(basketKey(name), baskets); renderBaskets(); })
+      .catch(() => {});
+  }
+  if (baskets >= 1) unlock("basket1");
+  if (baskets >= 10) unlock("basket10");
+  if (baskets >= 23) unlock("basket23");
+}
+
+const hoopGame = initHoop({
+  onBasket: scoredBasket,
+  onDunk: () => { sfx.brick(); unlock("dunk"); },
+  sound: (kind, power) => (kind === "rim" ? sfx.rim() : sfx.bounce(power))
+});
+if (new URLSearchParams(location.search).has("debug")) window.__hoop = hoopGame; // for automated checks only
+
 /* ---------- Startup ---------- */
 $("player-name").value = getName();
 $("fact-block").hidden = !API;
 updateFoot();
-syncAch(getName());
+syncAch(getName()); // also syncs baskets
 bumpIdle();
 renderBoard($("board-start"));
 loadGenerated().then(updateFoot);

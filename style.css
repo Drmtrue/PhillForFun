@@ -558,3 +558,19 @@ body.spicy::after {
 @keyframes burst-drop {
   to { transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(.2); opacity: 0; }
 }
+
+/* ---------- Side-court mini-game ---------- */
+.hoop-layer { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+body.hoop-hover, body.hoop-hover * { cursor: grab !important; }
+body.hoop-grabbing, body.hoop-grabbing * { cursor: grabbing !important; }
+.hoop-hud {
+  display: none;
+  position: fixed; left: 14px; top: 14px; z-index: 5;
+  padding: 6px 12px; border-radius: 99px;
+  background: rgba(5, 4, 4, .7); border: 1px solid #2a2222;
+  font-size: 14px; color: var(--muted);
+}
+body.hoop-on .hoop-hud { display: block; }
+.hoop-hud b { font-family: "Graduate", serif; color: var(--led); font-weight: 400; }
+.hoop-hud.bump { animation: hud-bump .4s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes hud-bump { 40% { transform: scale(1.25); } }
