@@ -4,35 +4,82 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Трансформация безрабочего</title>
-  <meta name="description" content="Квиз: кто лучше всех знает Фила?">
+  <meta name="description" content="Квиз: кто лучше всех знает Фила aka x23x?">
+  <meta name="theme-color" content="#0b0a0a">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Фон: разметка площадки и пузыри из ванны -->
+  <div class="court" aria-hidden="true">
+    <svg viewBox="0 0 1000 1400" preserveAspectRatio="xMidYMin slice">
+      <g fill="none" stroke="currentColor" stroke-width="3">
+        <rect x="40" y="40" width="920" height="1320" />
+        <line x1="40" y1="700" x2="960" y2="700" />
+        <circle cx="500" cy="700" r="120" />
+        <circle cx="500" cy="700" r="40" />
+        <rect x="330" y="40" width="340" height="380" />
+        <circle cx="500" cy="420" r="120" />
+        <path d="M110 40 V180 A390 390 0 0 0 890 180 V40" />
+        <rect x="330" y="980" width="340" height="380" />
+        <circle cx="500" cy="980" r="120" />
+        <path d="M110 1360 V1220 A390 390 0 0 1 890 1220 V1360" />
+      </g>
+    </svg>
+  </div>
+  <div class="bubbles" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+
   <main class="wrap">
 
     <!-- Старт -->
     <section id="screen-start" class="screen active">
-      <p class="kicker">квиз • 10 вопросов</p>
-      <h1>Трансформация<br><span>безрабочего</span></h1>
-      <p class="lead">Кто лучше всех знает Фила? Ответь на 10 вопросов и узнай, где ты в этой схеме.</p>
+      <div class="hero">
+        <div class="hero-text">
+          <p class="kicker"><span class="dot"></span> квиз • 10 вопросов • ник x23x</p>
+          <h1>Трансформация<br><span>безрабочего</span></h1>
+          <p class="lead">Кто лучше всех знает Фила? Ответь на 10 вопросов и узнай, где ты в этой схеме.</p>
+        </div>
+
+        <!-- Майка с номером 23 -->
+        <div class="jersey-wrap" aria-hidden="true">
+          <div class="smoke"><span></span><span></span><span></span></div>
+          <svg class="jersey" viewBox="0 0 200 230">
+            <path class="jersey-body" d="M62 8 C70 28 130 28 138 8 L168 18 C164 40 170 62 186 74 L178 222 L22 222 L14 74 C30 62 36 40 32 18 Z"/>
+            <path class="jersey-trim" d="M62 8 C70 28 130 28 138 8" />
+            <path class="jersey-trim" d="M32 18 C36 40 30 62 14 74" />
+            <path class="jersey-trim" d="M168 18 C164 40 170 62 186 74" />
+            <text x="100" y="78" class="jersey-name" text-anchor="middle">ФИЛ</text>
+            <text x="100" y="178" class="jersey-num" text-anchor="middle">23</text>
+          </svg>
+        </div>
+      </div>
+
       <form id="start-form" class="start-form" autocomplete="off">
-        <label for="player-name">Как тебя зовут?</label>
+        <label for="player-name">Выход на площадку. Как тебя зовут?</label>
         <input id="player-name" maxlength="30" placeholder="Твоё имя" required>
-        <button type="submit" class="btn primary">Начать</button>
+        <button type="submit" class="btn primary">Тип-офф</button>
       </form>
-      <div class="board-block">
-        <h2>Рейтинг</h2>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Таблица лидеров</h2>
+          <span class="tag">сезон 23</span>
+        </div>
         <ol class="board" id="board-start"><li class="muted">Загрузка…</li></ol>
       </div>
 
-      <div class="board-block fact-block" id="fact-block" hidden>
-        <h2>Знаешь что-то о Филе?</h2>
+      <div class="panel fact-block" id="fact-block" hidden>
+        <div class="panel-head">
+          <h2>Знаешь что-то о Филе?</h2>
+          <span class="tag">скаутинг</span>
+        </div>
         <p class="muted small">Напиши факт, и ИИ сам придумает по нему смешные вопросы. Они сразу попадут в игру.</p>
         <form id="fact-form" autocomplete="off">
-          <textarea id="fact-text" maxlength="300" rows="3" placeholder="Например: Фил однажды пошёл за хлебом и вернулся с новым билдом в POE" required></textarea>
+          <textarea id="fact-text" maxlength="300" rows="3" placeholder="Например: Фил однажды лёг в ванну на пять минут и вышел через два часа с новым билдом в POE" required></textarea>
           <div class="fact-row">
             <span class="muted small" id="fact-count">0/300</span>
             <button type="submit" class="btn primary" id="fact-btn">Добавить факт</button>
@@ -44,27 +91,55 @@
 
     <!-- Вопрос -->
     <section id="screen-quiz" class="screen">
+      <div class="scoreboard">
+        <div class="sb-cell">
+          <span class="sb-label">Вопрос</span>
+          <span class="sb-digits" id="q-counter">1/10</span>
+        </div>
+        <div class="sb-cell sb-mid">
+          <span class="sb-label">x23x</span>
+          <span class="sb-ball" aria-hidden="true"></span>
+        </div>
+        <div class="sb-cell">
+          <span class="sb-label">Очки</span>
+          <span class="sb-digits" id="live-score">0</span>
+        </div>
+      </div>
       <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
-      <p class="kicker" id="q-counter">Вопрос 1 из 10</p>
+
       <h2 class="question" id="q-text"></h2>
       <div class="answers" id="answers"></div>
+      <p class="call" id="call" aria-live="polite"></p>
       <p class="muted small author" id="q-author" hidden></p>
       <button class="btn primary next" id="next-btn" hidden>Дальше</button>
     </section>
 
     <!-- Результат -->
     <section id="screen-result" class="screen">
-      <p class="kicker">результат</p>
-      <div class="score"><span id="score-num">0</span><small>/<span id="score-total">10</span></small></div>
+      <p class="kicker"><span class="dot"></span> финальная сирена</p>
+      <div class="final">
+        <div class="final-team">
+          <span class="sb-label" id="final-name">Ты</span>
+          <span class="final-digits" id="score-num">0</span>
+        </div>
+        <span class="final-sep">:</span>
+        <div class="final-team">
+          <span class="sb-label">Вопросов</span>
+          <span class="final-digits dim" id="score-total">10</span>
+        </div>
+      </div>
       <h2 class="verdict" id="verdict"></h2>
       <p class="lead" id="verdict-sub"></p>
       <p class="muted small" id="save-status"></p>
       <div class="row">
-        <button class="btn primary" id="again-btn">Ещё раз</button>
+        <button class="btn primary" id="again-btn">Ещё матч</button>
         <button class="btn" id="share-btn">Позвать друга</button>
       </div>
-      <div class="board-block">
-        <h2>Рейтинг</h2>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Таблица лидеров</h2>
+          <span class="tag">сезон 23</span>
+        </div>
         <ol class="board" id="board-result"></ol>
       </div>
     </section>

@@ -2,7 +2,7 @@
 
 const SYSTEM = `You write questions for a Russian-language party quiz called «Трансформация безрабочего» about a real guy named Фил (Phil). Friends play it to see who knows him best. Phil asked for this quiz himself and is fine with being roasted.
 
-Known lore about Phil: smokes for an extremely long time; favorite game is Path of Exile (POE); lives off RMT (selling game items for real money); hates working; his longest job ever lasted about a month; adores adjika; his catchphrase is «Где я в этой схеме?».
+Known lore about Phil: smokes for an extremely long time; favorite game is Path of Exile (POE); lives off RMT (selling game items for real money); hates working; his longest job ever lasted about a month; adores adjika; his catchphrase is «Где я в этой схеме?»; loves basketball, his favorite player is Michael Jordan (#23), and for years his nickname was x23x; loves video games, smoking and taking long baths.
 
 A friend submits ONE new fact. Your job:
 
@@ -17,7 +17,7 @@ A friend submits ONE new fact. Your job:
 2. Otherwise write 2 or 3 questions in Russian based on THIS fact (lore may be used for jokes, but each question's correct answer must follow from the new fact).
    Humor is the main goal:
    - Phrase questions as absurd situations, mini-stories or "what would Phil do" scenarios, not dry "what is his favorite X".
-   - Wrong answers: funny, absurd but in-universe, playing on the lore (work, POE, RMT, adjika, long smoke breaks, «где я в этой схеме»). They must be clearly false given the fact, never accidentally true.
+   - Wrong answers: funny, absurd but in-universe, playing on the lore (work, POE, RMT, adjika, long smoke breaks, baths, basketball/MJ/23/x23x, «где я в этой схеме»). They must be clearly false given the fact, never accidentally true.
    - The correct answer must NOT stand out: similar length and style to the wrong ones, no "всегда/никогда" giveaways, not always the longest.
    - Each question tests a different angle of the fact. Do not repeat existing questions.
    - Short: question ≤ 160 characters, each answer ≤ 70 characters. Natural colloquial Russian, light, no swearing.

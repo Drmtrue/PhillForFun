@@ -107,13 +107,17 @@ function shuffle(arr) {
 }
 
 const VERDICTS = [
-  { min: 0,  title: "Ты вообще кто?",              sub: "Где ты в этой схеме? Явно не рядом с Филом." },
-  { min: 3,  title: "Знакомы по чату в POE",        sub: "Видел ник, пару раз здоровались. Не больше." },
-  { min: 5,  title: "Вместе курили. Недолго",       sub: "Ну, по меркам Фила вы толком и не начинали." },
-  { min: 7,  title: "Почти братан",                 sub: "Аджику тебе доверить можно. Схему — пока нет." },
-  { min: 9,  title: "Правая рука в РМТ",            sub: "Ты знаешь о Филе больше, чем любой работодатель. Хотя их было немного." },
-  { min: 10, title: "Ты и есть Фил?",               sub: "Идеально. Подозрительно идеально. Ты точно не безработный?" }
+  { min: 0,  title: "Сидишь на трибуне",       sub: "Где ты в этой схеме? Даже не на скамейке. Купи билет и попробуй ещё раз." },
+  { min: 3,  title: "Подаёшь полотенца",       sub: "Ник x23x слышал, пару раз здоровались в чате POE. Пока не больше." },
+  { min: 5,  title: "Шестой игрок",            sub: "Вместе курили. Недолго. По меркам Фила вы толком и не начинали." },
+  { min: 7,  title: "Стартовая пятёрка",       sub: "Аджику тебе доверить можно. Схему пока нет." },
+  { min: 9,  title: "MVP сезона",              sub: "Ты знаешь о Филе больше, чем любой работодатель. Хотя их было немного." },
+  { min: 10, title: "Ты и есть x23x?",         sub: "Идеальная игра. Подозрительно идеальная. Признавайся: ты пишешь это из ванны?" }
 ];
+
+const SWISH = ["Свиш!", "Чисто!", "Трёхочковый!", "Данк!", "Как MJ!"];
+const BRICK = ["Кирпич!", "Мимо кольца!", "Эйрбол!", "В щит!", "Блок-шот!"];
+const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 function verdictFor(score, total) {
   const scaled = Math.round((score / total) * 10);
@@ -149,7 +153,10 @@ function startGame(name) {
 function renderQuestion() {
   const { questions, i } = game;
   const cur = questions[i];
-  $("q-counter").textContent = `Вопрос ${i + 1} из ${questions.length}`;
+  $("q-counter").textContent = `${i + 1}/${questions.length}`;
+  $("live-score").textContent = game.score;
+  $("call").textContent = "";
+  $("call").className = "call";
   $("progress-bar").style.width = `${(i / questions.length) * 100}%`;
   $("q-text").textContent = cur.q;
   $("next-btn").hidden = true;
@@ -177,6 +184,9 @@ function pick(btn, text) {
   const cur = game.questions[game.i];
   const right = text === cur.correct;
   if (right) game.score++;
+  $("live-score").textContent = game.score;
+  $("call").textContent = right ? pickOne(SWISH) : pickOne(BRICK);
+  $("call").className = "call " + (right ? "swish" : "brick");
   document.querySelectorAll(".answer").forEach((b) => {
     b.disabled = true;
     const val = b.lastChild.textContent;
@@ -195,6 +205,7 @@ async function finish() {
   const v = verdictFor(game.score, total);
   $("score-num").textContent = game.score;
   $("score-total").textContent = total;
+  $("final-name").textContent = game.name;
   $("verdict").textContent = v.title;
   $("verdict-sub").textContent = v.sub;
   $("save-status").textContent = "Сохраняю результат…";
@@ -296,7 +307,7 @@ function updateFoot() {
 }
 
 $("share-btn").addEventListener("click", async () => {
-  const data = { title: QUIZ.title, text: `Я набрал ${game.score}/${game.questions.length}. А ты знаешь Фила лучше?`, url: location.href };
+  const data = { title: QUIZ.title, text: `Я набрал ${game.score}/${game.questions.length} в квизе про x23x. А ты знаешь Фила лучше?`, url: location.href };
   try {
     if (navigator.share) await navigator.share(data);
     else {
