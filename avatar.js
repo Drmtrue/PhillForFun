@@ -140,6 +140,8 @@ const LINES = {
       "Мяч скучает. Сейчас исправим."
     ]
   },
+  // The 5% roll came up: he calls the shot before taking it
+  callShot: { mood: "smug", pri: 3, lines: ["Скриньте - один раз показываю"] },
   // Phil missed his own shot: everything and everyone is to blame
   blame: {
     mood: "sad", pri: 3, lines: [
@@ -286,7 +288,7 @@ export function initAvatar() {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251508")
+  import("./phil3d.js?v=202610251509")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, { bubble, onClick: () => say("click", { force: true }) });
       root.classList.add("phil-3d");
@@ -335,7 +337,8 @@ export function initAvatar() {
   function tryShot(make = Math.random() < MAKE_CHANCE) {
     if (!body3d || !court || !court.enabled || document.hidden || body3d.busy || document.querySelector(".ft-overlay")) return false;
     if (!body3d.shoot(court, make)) return false;
-    say("shootStart");
+    if (make) say("callShot", { force: true });
+    else say("shootStart");
     return true;
   }
   (function scheduleShot() {
