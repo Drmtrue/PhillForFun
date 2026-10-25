@@ -121,7 +121,7 @@ Below the prices is a savings goal (`RMT_GOAL` in `config.js`: a new PC for 250 
 
 `rmt-page.js` renders the section from `/prices`; charts come from `charts.js` (dependency-free SVG line charts with a crosshair tooltip, legend, reference lines and markers, redrawn on resize). PoE 1 and PoE 2 use a validated amber/blue pair (`#cc8208`, `#3b8fe8`).
 
-- **Обзор:** per game — cheapest price with trend, 100 pcs, online sellers out of all, median online price, online stock, price vs league start, day of season.
+- **Обзор:** per game — cheapest price with trend, 100 pcs, online sellers out of all, median online price, how many Divines the 10 cheapest sellers have (total online stock is not shown: some sellers list placeholder amounts in the billions), price vs league start, day of season.
 - **Графики:** hourly minimum price and online sellers for the last 24 h / 3 / 14 days (both games), and per-game season curves (model line, real daily minimums, today marker). Prices of the two games differ in scale, so season curves are separate small charts rather than a shared axis.
 - **Стакан:** the 10 cheapest online offers per game with stock bars (log scale) and the spread.
 - **Сезоны:** timelines from league start to end and the next league, with a today marker and countdowns.

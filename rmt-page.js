@@ -1,9 +1,9 @@
 // The "Биржа РМТ" section: overview cards, charts, order book, season timelines, the savings goal with a
 // farming-rate calculator, and the method notes. renderRmt(root, rows, meta) rebuilds it from /prices data.
 
-import { SEASONS, RMT_GOAL, RMT_MODEL } from "./config.js?v=202610251538";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251538";
-import { lineChart } from "./charts.js?v=202610251538";
+import { SEASONS, RMT_GOAL, RMT_MODEL } from "./config.js?v=202610251542";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251542";
+import { lineChart } from "./charts.js?v=202610251542";
 
 const COLORS = { poe1: "#cc8208", poe2: "#3b8fe8" };   // validated categorical pair on the dark surface
 const DAY = 86400000;
@@ -117,7 +117,7 @@ function overview(games, meta) {
       <dl class="rmt-kv">
         <div><dt>Продавцов онлайн</dt><dd>${g.onlineOffers} <small>из ${g.offers}</small></dd></div>
         <div><dt>Медиана онлайн</dt><dd>${g.median != null ? rub(g.median) : "—"}</dd></div>
-        <div><dt>В наличии онлайн</dt><dd>${g.stock != null ? `${int(g.stock)} шт` : "—"}</dd></div>
+        <div><dt>У 10 самых дешёвых</dt><dd>${g.ladder?.length ? `${int(g.ladder.reduce((n, o) => n + o.amount, 0))} шт` : "—"}</dd></div>
         <div><dt>От цены на старте</dt><dd>${g.stats ? `${pct(g.stats.now / g.stats.start)}` : "—"}</dd></div>
       </dl>
       <div class="rmt-season-bar" title="День сезона"><i style="width:${Math.min(100, (g.sd.day / g.sd.length) * 100).toFixed(1)}%"></i></div>

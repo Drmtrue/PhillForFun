@@ -1,12 +1,12 @@
-import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251538";
-import { renderRmt } from "./rmt-page.js?v=202610251538";
-import { initHoop } from "./hoop.js?v=202610251538";
-import { freeThrow } from "./freethrow.js?v=202610251538";
-import { onSkinChange } from "./ballskin.js?v=202610251538";
-import { mountSmoke } from "./game-smoke.js?v=202610251538";
-import { mountFarm } from "./game-farm.js?v=202610251538";
-import { mountBath } from "./game-bath.js?v=202610251538";
-import { initAvatar } from "./avatar.js?v=202610251538";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251542";
+import { renderRmt } from "./rmt-page.js?v=202610251542";
+import { initHoop } from "./hoop.js?v=202610251542";
+import { freeThrow } from "./freethrow.js?v=202610251542";
+import { onSkinChange } from "./ballskin.js?v=202610251542";
+import { mountSmoke } from "./game-smoke.js?v=202610251542";
+import { mountFarm } from "./game-farm.js?v=202610251542";
+import { mountBath } from "./game-bath.js?v=202610251542";
+import { initAvatar } from "./avatar.js?v=202610251542";
 
 const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 
