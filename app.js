@@ -269,7 +269,7 @@ $("fact-form").addEventListener("submit", async (e) => {
   }
   setName(author);
   $("fact-btn").disabled = true;
-  $("fact-btn").textContent = "ИИ сочиняет…";
+  $("fact-btn").textContent = "Root AI сочиняет…";
   box.textContent = "Придумываю вопросы, это займёт несколько секунд…";
   try {
     const res = await api("/facts", { method: "POST", body: JSON.stringify({ fact, author }) });

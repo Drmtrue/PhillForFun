@@ -19,7 +19,7 @@ FACTS_PER_HOUR_PER_IP = "20"
 FACTS_PER_DAY_TOTAL = "100"
 
 # Secrets are set in the Cloudflare dashboard (Settings -> Variables and secrets), not here:
-#   ANTHROPIC_API_KEY - API key from console.anthropic.com
+#   AI_API_KEY        - API key for Root AI - model b1t quiz v1.1
 #   ADMIN_TOKEN       - any long password for the admin.html page
 
 [observability]

@@ -1,4 +1,4 @@
-// Turns a fact about Phil into funny quiz questions via the Claude API.
+// Root AI - model b1t quiz v1.1: turns a fact about Phil into funny quiz questions.
 
 const SYSTEM = `You write questions for a Russian-language party quiz called «Трансформация Безработного» about a real guy named Фил (Phil). Friends play it to see who knows him best. Phil asked for this quiz himself and is fine with being roasted.
 
@@ -62,12 +62,12 @@ export async function generateQuestions(env, fact, context) {
     `<fact>${fact}</fact>`
   ].join("\n");
 
-  const base = env.ANTHROPIC_BASE || "https://api.anthropic.com";
+  const base = env.AI_BASE_URL || "https://api.anthropic.com";
   const res = await fetch(`${base}/v1/messages`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": env.ANTHROPIC_API_KEY,
+      "x-api-key": env.AI_API_KEY || env.ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
@@ -83,7 +83,7 @@ export async function generateQuestions(env, fact, context) {
   });
 
   if (!res.ok) {
-    console.error("Anthropic API error", res.status, await res.text());
+    console.error("AI API error", res.status, await res.text());
     throw new Error("generation failed");
   }
 

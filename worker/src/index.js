@@ -57,7 +57,7 @@ export default {
         const fact = clean(body.fact, 300);
         const author = clean(body.author, 30) || "Аноним";
         if (fact.length < 8) return json({ error: "Слишком коротко. Расскажи подробнее!" }, 400);
-        if (!env.ANTHROPIC_API_KEY) return json({ error: "Генерация не настроена" }, 503);
+        if (!(env.AI_API_KEY || env.ANTHROPIC_API_KEY)) return json({ error: "Генерация не настроена" }, 503);
 
         const perHour = Number(env.FACTS_PER_HOUR_PER_IP || 20);
         const perDay = Number(env.FACTS_PER_DAY_TOTAL || 100);
