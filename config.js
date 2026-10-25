@@ -1,7 +1,7 @@
 // Настройки квиза.
 
 export const QUIZ = {
-  title: "Трансформация безрабочего",
+  title: "Трансформация Безработного",
   friend: "Фил",
   questionsPerGame: 10
 };

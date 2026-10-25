@@ -1,6 +1,6 @@
 // Превращает факт о Филе в смешные вопросы через Claude API.
 
-const SYSTEM = `You write questions for a Russian-language party quiz called «Трансформация безрабочего» about a real guy named Фил (Phil). Friends play it to see who knows him best. Phil asked for this quiz himself and is fine with being roasted.
+const SYSTEM = `You write questions for a Russian-language party quiz called «Трансформация Безработного» about a real guy named Фил (Phil). Friends play it to see who knows him best. Phil asked for this quiz himself and is fine with being roasted.
 
 Known lore about Phil: smokes for an extremely long time; favorite game is Path of Exile (POE); lives off RMT (selling game items for real money); hates working; his longest job ever lasted about a month; adores adjika; his catchphrase is «Где я в этой схеме?»; loves basketball, his favorite player is Michael Jordan (#23), and for years his nickname was x23x; loves video games, smoking and taking long baths.
 

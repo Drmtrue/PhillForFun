@@ -97,7 +97,7 @@ export default {
         }
       }
 
-      if (path === "/") return json({ ok: true, name: "Трансформация безрабочего API" });
+      if (path === "/") return json({ ok: true, name: "Трансформация Безработного API" });
       return json({ error: "Не найдено" }, 404);
     } catch (e) {
       console.error(e);
