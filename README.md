@@ -6,6 +6,20 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 
 > The code, comments and docs are in English. Everything players see (questions, buttons, verdicts) is in Russian on purpose.
 
+## Sections
+
+The site is a single page with hash routes, so switching sections never reloads it and the shared parts keep running: Phil the mascot, the side-court hoop and ball, the basket counter, toasts and sounds.
+
+| Route | Section |
+| --- | --- |
+| `#/` | Home: hero with the jersey and easter eggs, cards linking to every section with live teasers (quiz leader, current prices, achievements opened) |
+| `#/quiz` | Quiz: start form, leaderboard, fact submission, question and result screens (a game in progress survives switching sections) |
+| `#/rmt` | RMT exchange: Divine Orb prices and the PC savings goal |
+| `#/games` | Mini-games: free-throw practice (streak, record, accuracy; achievements for 5 and 10 in a row), the side-court hoop, and upcoming games |
+| `#/ach` | Achievements shared by the whole site |
+
+To add a mini-game, add a card to the games section in `index.html` and its logic to `app.js` (or its own module), unlocking achievements with `unlock()`.
+
 ## How it works
 
 | Part | Where | What it does |

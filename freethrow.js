@@ -1,4 +1,4 @@
-import { spinDetector, drawFace } from "./ballskin.js?v=202610251512";
+import { spinDetector, drawFace } from "./ballskin.js?v=202610251523";
 
 // Free throw after a wrong answer: a small court in a modal, one throw.
 // Resolves to { made, skipped, stats } where stats describe how the shot went (for achievements).
@@ -11,18 +11,28 @@ const RIM_DOT = 3;
 const GRAVITY = 1700;
 const MAX_SPEED = 2300;
 
-export function freeThrow({ sound, onEvent } = {}) {
+// Default texts are for the quiz's second chance; the mini-games page passes its own via `text`.
+const QUIZ_TEXT = {
+  kicker: "второй шанс",
+  help: "Потяни мяч и брось в кольцо. Одна попытка: попадёшь — ещё раз ответишь на вопрос.",
+  made: "Попал! Ещё одна попытка ответа.",
+  missed: "Мимо. Идём дальше.",
+  skip: "Не бросать"
+};
+
+export function freeThrow({ sound, onEvent, text = {} } = {}) {
+  const tx = { ...QUIZ_TEXT, ...text };
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "overlay ft-overlay";
     overlay.innerHTML = `
       <div class="overlay-card ft-card">
-        <p class="kicker"><span class="dot"></span> второй шанс</p>
+        <p class="kicker"><span class="dot"></span> ${tx.kicker}</p>
         <h2>Штрафной бросок</h2>
-        <p class="ft-help">Потяни мяч и брось в кольцо. Одна попытка: попадёшь — ещё раз ответишь на вопрос.</p>
+        <p class="ft-help">${tx.help}</p>
         <canvas class="ft-canvas"></canvas>
         <p class="ft-result" aria-live="polite"></p>
-        <button type="button" class="link-egg ft-skip">Не бросать</button>
+        <button type="button" class="link-egg ft-skip">${tx.skip}</button>
       </div>`;
     document.body.append(overlay);
     const canvas = overlay.querySelector("canvas");
@@ -126,7 +136,7 @@ export function freeThrow({ sound, onEvent } = {}) {
       if (finished) return;
       finished = true;
       clearTimeout(forgotTimer);
-      resultEl.textContent = made ? "Попал! Ещё одна попытка ответа." : "Мимо. Идём дальше.";
+      resultEl.textContent = made ? tx.made : tx.missed;
       resultEl.className = "ft-result " + (made ? "ok" : "bad");
       setTimeout(() => {
         overlay.remove();

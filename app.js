@@ -1,9 +1,9 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251512";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251512";
-import { initHoop } from "./hoop.js?v=202610251512";
-import { freeThrow } from "./freethrow.js?v=202610251512";
-import { onSkinChange } from "./ballskin.js?v=202610251512";
-import { initAvatar } from "./avatar.js?v=202610251512";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251523";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251523";
+import { initHoop } from "./hoop.js?v=202610251523";
+import { freeThrow } from "./freethrow.js?v=202610251523";
+import { onSkinChange } from "./ballskin.js?v=202610251523";
+import { initAvatar } from "./avatar.js?v=202610251523";
 
 const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 
@@ -198,6 +198,7 @@ function renderAch() {
   const grid = $("ach-grid");
   if (!grid) return;
   $("ach-count").textContent = `${ACH.filter((a) => unlocked.has(a.id)).length}/${ACH.length}`;
+  $("hub-ach").textContent = `Открыто ${$("ach-count").textContent}`;
   grid.innerHTML = "";
   for (const a of ACH) {
     const got = unlocked.has(a.id);
@@ -412,12 +413,15 @@ function verdictFor(score, total) {
 
 let game = null;
 
+// Quiz screens (start / question / result) inside the quiz section
 function show(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $(id).classList.add("active");
-  document.body.classList.toggle("playing", id === "screen-quiz");
+  updatePlaying();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+const updatePlaying = () =>
+  document.body.classList.toggle("playing", document.body.dataset.page === "quiz" && $("screen-quiz").classList.contains("active"));
 
 function startGame(name) {
   const pool = questionPool();
@@ -1010,6 +1014,8 @@ async function loadPrices() {
     $("rmt-note").textContent = "Самая низкая цена за 1 Divine Orb у продавцов онлайн в текущей лиге. Обновляется раз в 20 минут." +
       (converted ? ` FunPay показывает цены в ${converted.original.unit}, пересчитано по курсу ЦБ: 1 ${converted.original.unit} = ${fmtPrice(converted.rate)} ₽.` : "");
     $("rmt").hidden = false;
+    $("rmt-loading").hidden = true;
+    $("hub-rmt").textContent = rows.filter((r) => r.price != null).map((r) => `${r.short}: ${fmtPrice(r.price)} ₽`).join(" · ") || "Цены FunPay";
   } catch (e) { console.error(e); }
 }
 
@@ -1165,6 +1171,7 @@ const basketKey = (name) => `${BASKET_KEY}:${nameKey(name) || "_anon"}`;
 
 function renderBaskets() {
   $("hoop-count").textContent = baskets;
+  $("side-count").textContent = baskets;
 }
 
 async function syncBaskets(name) {
@@ -1234,6 +1241,75 @@ onSkinChange((face) => {
   if (face) unlock("faceball");
   phil.say(face ? "faceOn" : "faceOff", { force: true });
 });
+
+/* ---------- Mini-game: free-throw practice ---------- */
+const FT_PRACTICE_KEY = "phill_ft_practice";
+const ftp = { streak: 0, ...store.get(FT_PRACTICE_KEY, { best: 0, shots: 0, made: 0 }) };
+function renderPractice() {
+  $("ft-streak").textContent = ftp.streak;
+  $("ft-best").textContent = ftp.best;
+  $("ft-acc").textContent = ftp.shots ? `${Math.round((ftp.made / ftp.shots) * 100)}%` : "—";
+}
+$("ft-practice").addEventListener("click", async () => {
+  $("ft-practice").disabled = true;
+  // Throw after throw until the player presses "Хватит"
+  for (;;) {
+    const res = await freeThrow({
+      sound: playCourtSound,
+      text: {
+        kicker: `штрафные · серия ${ftp.streak}`,
+        help: "Потяни мяч и брось. Попадания подряд идут в серию, промах её обнуляет.",
+        made: "Есть! Следующий бросок…",
+        missed: "Мимо. Серия сгорела.",
+        skip: "Хватит"
+      }
+    });
+    if (res.skipped) break;
+    ftp.shots++;
+    if (res.made) {
+      ftp.made++;
+      ftp.streak++;
+      ftp.best = Math.max(ftp.best, ftp.streak);
+      if (ftp.streak >= 5) unlock("pr_streak5");
+      if (ftp.streak >= 10) unlock("pr_streak10");
+      phil.say("basket");
+    } else {
+      ftp.streak = 0;
+      phil.say("miss");
+    }
+    store.set(FT_PRACTICE_KEY, { best: ftp.best, shots: ftp.shots, made: ftp.made });
+    renderPractice();
+  }
+  $("ft-practice").disabled = false;
+});
+renderPractice();
+
+/* ---------- Sections (hash routes) ---------- */
+const PAGES = ["home", "quiz", "rmt", "games", "ach"];
+function route() {
+  const name = (location.hash.match(/^#\/?([\w-]+)/) || [])[1];
+  const page = PAGES.includes(name) ? name : "home";
+  document.querySelectorAll(".page").forEach((p) => { p.hidden = p.dataset.page !== page; });
+  document.querySelectorAll(".topnav a").forEach((a) => {
+    const on = a.dataset.page === page;
+    a.classList.toggle("active", on);
+    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  document.body.dataset.page = page;
+  updatePlaying();
+  if (page === "quiz" && $("screen-start").classList.contains("active")) renderBoard($("board-start"));
+  window.scrollTo({ top: 0 });
+}
+window.addEventListener("hashchange", route);
+route();
+
+async function renderHubQuiz() {
+  try {
+    const top = (await loadScores())[0];
+    $("hub-quiz").textContent = top ? `Лидер: ${top.name} · ${fmtAvg(top.avg)} в среднем` : "Пока никто не играл";
+  } catch (_) { /* keep the default text */ }
+}
+renderHubQuiz();
 
 /* ---------- Startup ---------- */
 $("player-name").value = getName();
