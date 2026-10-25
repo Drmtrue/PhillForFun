@@ -14,6 +14,7 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 | Built-in questions | `questions.js` | The starting question pool |
 | Achievements | `achievements.js` | Achievement catalogue (unlock logic and easter eggs live in `app.js`) |
 | Side-court mini-game | `hoop.js` | Drag-and-throw basketball in the free space beside the quiz (wide screens only) |
+| Free throw | `freethrow.js` | Second-chance shot after a wrong answer (all screen sizes) |
 | Server | `worker/` | Cloudflare Worker: takes facts, generates and moderates questions with Root AI - model b1t quiz v1.1, stores questions and scores |
 | Admin | `admin.html` | Review and delete player-generated questions, browse submitted facts |
 
@@ -84,3 +85,12 @@ The "Биржа РМТ" panel shows the cheapest price for 1 Divine Orb on FunPa
 - only offers from sellers who are online at the moment of the check;
 - prices in rubles: the server asks FunPay for ruble prices via its currency switch; if FunPay does not offer rubles for the server's location, it converts using the Central Bank of Russia daily rate and the page says so;
 - refreshed at most every 20 minutes, with a trend arrow when the price moves.
+
+## Free throw (second chance)
+
+After the first wrong answer to a question, the right answer stays hidden and a free-throw court opens in a modal. The player gets one throw from behind the free-throw line:
+
+- make it → the wrong option stays crossed out and the player answers the same question again (a right answer still earns the point);
+- miss it (or press "Не бросать") → the right answer is revealed and the game moves on.
+
+Only one free throw per question. Achievements: "Штрафной реализован" (made a free throw) and "Спасён с линии" (made it and then answered correctly).

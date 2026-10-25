@@ -604,3 +604,18 @@ body.hoop-on .hoop-hud { display: block; }
 .rmt-trend.down { color: var(--red-2); }
 .rmt-sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); }
 .rmt-note { margin: 8px 0 0; font-size: 12.5px; }
+
+/* ---------- Free throw modal ---------- */
+.ft-card { width: min(440px, 100%); padding-bottom: 12px; }
+.ft-card .kicker { justify-content: center; }
+.ft-help { font-size: 14px; }
+.ft-canvas {
+  display: block; margin: 10px auto 0; border-radius: 12px;
+  border: 1px solid var(--line); touch-action: none; cursor: default;
+}
+.ft-canvas.hover { cursor: grab; }
+.ft-canvas.grabbing { cursor: grabbing; }
+.ft-result { min-height: 1.4em; margin: 10px 0 2px !important; font-family: "Anton", sans-serif; font-size: 22px; text-transform: uppercase; letter-spacing: .03em; }
+.ft-result.ok { color: var(--green) !important; }
+.ft-result.bad { color: var(--wood) !important; }
+.ft-skip { font-size: 13px; color: var(--muted); margin-top: 2px; }

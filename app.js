@@ -1,5 +1,6 @@
-import { QUIZ, API_URL } from "./config.js?v=202610251211";
-import { initHoop } from "./hoop.js?v=202610251211";
+import { QUIZ, API_URL } from "./config.js?v=202610251230";
+import { initHoop } from "./hoop.js?v=202610251230";
+import { freeThrow } from "./freethrow.js?v=202610251230";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -468,29 +469,65 @@ function renderQuestion() {
 
 function pick(btn, text) {
   const cur = game.questions[game.i];
+  if (cur.busy) return;
   const right = text === cur.correct;
+  const firstTry = !cur.tries;
+  cur.tries = (cur.tries || 0) + 1;
   const took = performance.now() - game.shownAt;
 
   if (right) { game.score++; game.streak++; game.misses = 0; }
   else { game.streak = 0; game.misses++; }
 
-  if (took < 1500) unlock("fast");
-  if (took > 60000) unlock("slow");
+  if (firstTry && took < 1500) unlock("fast");
+  if (firstTry && took > 60000) unlock("slow");
   if (game.streak >= 5) unlock("streak5");
   if (game.misses >= 3) unlock("brick3");
   if (!right && WORK_WORDS.test(text)) unlock("workaholic");
   if (right && /аджик/i.test(cur.q + " " + cur.correct)) unlock("adjika");
+  if (right && cur.freeThrowMade) unlock("ft_saved");
 
   right ? sfx.swish() : sfx.brick();
   $("live-score").textContent = game.score;
   $("call").textContent = right ? pickOne(SWISH) : pickOne(BRICK);
   $("call").className = "call " + (right ? "swish" : "brick");
+
+  // First wrong answer: a free throw for a second try. The right answer stays hidden until it is over.
+  if (!right && firstTry) {
+    btn.classList.add("wrong");
+    btn.disabled = true;
+    cur.busy = true;
+    document.querySelectorAll(".answer").forEach((b) => (b.disabled = true));
+    $("call").textContent = "Промах! На линию штрафного…";
+    setTimeout(async () => {
+      const made = await freeThrow({ sound: playCourtSound });
+      cur.busy = false;
+      game.freeThrows = (game.freeThrows || 0) + 1;
+      if (made) {
+        cur.freeThrowMade = true;
+        unlock("ft_made");
+        $("call").textContent = "Штрафной забит! Ещё одна попытка";
+        $("call").className = "call swish";
+        document.querySelectorAll(".answer").forEach((b) => { if (!b.classList.contains("wrong")) b.disabled = false; });
+        game.shownAt = performance.now();
+      } else {
+        $("call").textContent = "Штрафной смазан";
+        $("call").className = "call brick";
+        reveal(cur);
+      }
+    }, 650);
+    return;
+  }
+  reveal(cur, btn);
+}
+
+// Show the right answer, lock the buttons and offer the next question
+function reveal(cur, picked) {
   document.querySelectorAll(".answer").forEach((b) => {
     b.disabled = true;
     const val = b.lastChild.textContent;
     if (val === cur.correct) b.classList.add("correct");
-    else if (b === btn) b.classList.add("wrong");
-    else b.classList.add("dim");
+    else if (b === picked) b.classList.add("wrong");
+    else if (!b.classList.contains("wrong")) b.classList.add("dim");
   });
   const last = game.i === game.questions.length - 1;
   $("next-btn").textContent = last ? "Узнать результат" : "Дальше";
@@ -991,10 +1028,17 @@ function scoredBasket() {
   if (baskets >= 23) unlock("basket23");
 }
 
+function playCourtSound(kind, power) {
+  if (kind === "rim") sfx.rim();
+  else if (kind === "bounce") sfx.bounce(power);
+  else if (kind === "swish") sfx.swish();
+  else if (kind === "brick") sfx.brick();
+}
+
 const hoopGame = initHoop({
   onBasket: scoredBasket,
   onDunk: () => { sfx.brick(); unlock("dunk"); },
-  sound: (kind, power) => (kind === "rim" ? sfx.rim() : sfx.bounce(power))
+  sound: playCourtSound
 });
 if (new URLSearchParams(location.search).has("debug")) window.__hoop = hoopGame; // for automated checks only
 

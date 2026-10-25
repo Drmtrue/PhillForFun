@@ -22,6 +22,10 @@ window.ACHIEVEMENTS = [
   { id: "facecontrol", icon: "🚫", title: "Фейс-контроль",              desc: "Пришли факт, который Root AI отклонит." },
   { id: "selfcheck",   icon: "🪞", title: "Самопроверка",               desc: "Начни игру под именем самого Фила." },
 
+  // ----- Free throw (second chance after a wrong answer) -----
+  { id: "ft_made",     icon: "🎯", title: "Штрафной реализован",        desc: "Ошибся с ответом, но забил штрафной и получил второй шанс." },
+  { id: "ft_saved",    icon: "🦸", title: "Спасён с линии",             desc: "Забил штрафной и со второй попытки ответил правильно." },
+
   // ----- Side-court mini-game -----
   { id: "basket1",     icon: "🏀", title: "Дворовый баскетбол",         desc: "Закинь мяч в кольцо сбоку от квиза." },
   { id: "basket10",    icon: "🎯", title: "Снайпер с лавочки",          desc: "10 попаданий в боковое кольцо." },
