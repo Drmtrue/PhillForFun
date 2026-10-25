@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Трансформация безрабочего</title>
+  <meta name="description" content="Квиз: кто лучше всех знает Фила?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+
+    <!-- Старт -->
+    <section id="screen-start" class="screen active">
+      <p class="kicker">квиз • 10 вопросов</p>
+      <h1>Трансформация<br><span>безрабочего</span></h1>
+      <p class="lead">Кто лучше всех знает Фила? Ответь на 10 вопросов и узнай, где ты в этой схеме.</p>
+      <form id="start-form" class="start-form" autocomplete="off">
+        <label for="player-name">Как тебя зовут?</label>
+        <input id="player-name" maxlength="30" placeholder="Твоё имя" required>
+        <button type="submit" class="btn primary">Начать</button>
+      </form>
+      <div class="board-block">
+        <h2>Рейтинг</h2>
+        <ol class="board" id="board-start"><li class="muted">Загрузка…</li></ol>
+      </div>
+    </section>
+
+    <!-- Вопрос -->
+    <section id="screen-quiz" class="screen">
+      <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+      <p class="kicker" id="q-counter">Вопрос 1 из 10</p>
+      <h2 class="question" id="q-text"></h2>
+      <div class="answers" id="answers"></div>
+      <button class="btn primary next" id="next-btn" hidden>Дальше</button>
+    </section>
+
+    <!-- Результат -->
+    <section id="screen-result" class="screen">
+      <p class="kicker">результат</p>
+      <div class="score"><span id="score-num">0</span><small>/<span id="score-total">10</span></small></div>
+      <h2 class="verdict" id="verdict"></h2>
+      <p class="lead" id="verdict-sub"></p>
+      <p class="muted small" id="save-status"></p>
+      <div class="row">
+        <button class="btn primary" id="again-btn">Ещё раз</button>
+        <button class="btn" id="share-btn">Позвать друга</button>
+      </div>
+      <div class="board-block">
+        <h2>Рейтинг</h2>
+        <ol class="board" id="board-result"></ol>
+      </div>
+    </section>
+
+  </main>
+  <footer class="foot" id="foot"></footer>
+
+  <script src="questions.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
