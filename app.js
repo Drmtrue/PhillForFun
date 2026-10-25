@@ -1,4 +1,4 @@
-import { QUIZ, firebase } from "./config.js";
+import { QUIZ, API_URL } from "./config.js";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -13,27 +13,22 @@ function setName(name) {
   document.cookie = `${NAME_COOKIE}=${encodeURIComponent(name)}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax`;
 }
 
-/* ---------- Рейтинг: Firebase или локально ---------- */
-let db = null;
-let fs = null;
+/* ---------- Сервер (Cloudflare) или локальный режим ---------- */
+const API = API_URL.replace(/\/+$/, "");
 
-async function initStore() {
-  if (!firebase) return;
-  try {
-    const appMod = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
-    fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-    db = fs.getFirestore(appMod.initializeApp(firebase));
-  } catch (e) {
-    console.error("Firebase не подключился", e);
-    db = null;
-  }
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || "Ошибка сервера"), { data });
+  return data;
 }
 
 async function saveScore(name, score, total) {
-  if (db) {
-    await fs.addDoc(fs.collection(db, "scores"), {
-      name, score, total, createdAt: fs.serverTimestamp()
-    });
+  if (API) {
+    await api("/scores", { method: "POST", body: JSON.stringify({ name, score, total }) });
     return;
   }
   const list = readLocal();
@@ -46,15 +41,18 @@ function readLocal() {
 }
 
 async function loadScores() {
-  if (db) {
-    const q = fs.query(fs.collection(db, "scores"), fs.orderBy("score", "desc"), fs.limit(300));
-    const snap = await fs.getDocs(q);
-    return snap.docs.map((d) => {
-      const x = d.data();
-      return { ...x, createdAt: x.createdAt?.toMillis?.() ?? Date.now() };
-    });
-  }
+  if (API) return (await api("/scores")).scores;
   return readLocal();
+}
+
+// Вопросы: встроенные + сгенерированные по фактам
+let generated = [];
+async function loadGenerated() {
+  if (!API) return;
+  try { generated = (await api("/questions")).questions || []; } catch (e) { console.error(e); }
+}
+function questionPool() {
+  return [...(window.QUESTIONS || []), ...generated];
 }
 
 // Лучший результат каждого игрока; при равенстве выше тот, кто набрал раньше
@@ -131,13 +129,14 @@ function show(id) {
 }
 
 function startGame(name) {
-  const pool = window.QUESTIONS || [];
+  const pool = questionPool();
   const n = Math.min(QUIZ.questionsPerGame, pool.length);
   game = {
     name,
     questions: shuffle(pool).slice(0, n).map((q) => ({
       q: q.q,
       correct: q.correct,
+      author: q.author || "",
       answers: shuffle([q.correct, ...q.wrong])
     })),
     i: 0,
@@ -154,6 +153,8 @@ function renderQuestion() {
   $("progress-bar").style.width = `${(i / questions.length) * 100}%`;
   $("q-text").textContent = cur.q;
   $("next-btn").hidden = true;
+  $("q-author").hidden = !cur.author;
+  $("q-author").textContent = cur.author ? `Вопрос по факту от: ${cur.author}` : "";
 
   const box = $("answers");
   box.innerHTML = "";
@@ -201,7 +202,7 @@ async function finish() {
 
   try {
     await saveScore(game.name, game.score, total);
-    $("save-status").textContent = db ? "" : "Рейтинг пока сохраняется только в этом браузере.";
+    $("save-status").textContent = API ? "" : "Рейтинг пока сохраняется только в этом браузере.";
   } catch (e) {
     console.error(e);
     $("save-status").textContent = "Не удалось сохранить результат.";
@@ -227,7 +228,72 @@ $("next-btn").addEventListener("click", () => {
   }
 });
 
-$("again-btn").addEventListener("click", () => startGame(game.name));
+$("again-btn").addEventListener("click", async () => {
+  await loadGenerated();
+  startGame(game.name);
+});
+
+/* ---------- Добавление фактов ---------- */
+$("fact-text").addEventListener("input", () => {
+  $("fact-count").textContent = `${$("fact-text").value.length}/300`;
+});
+
+$("fact-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fact = $("fact-text").value.trim();
+  const author = $("player-name").value.trim().slice(0, 30);
+  const box = $("fact-result");
+  box.hidden = false;
+  box.className = "fact-result";
+  if (!author) {
+    box.classList.add("bad");
+    box.textContent = "Сначала впиши своё имя сверху, чтобы мы знали, кого благодарить.";
+    $("player-name").focus();
+    return;
+  }
+  if (fact.length < 8) {
+    box.classList.add("bad");
+    box.textContent = "Слишком коротко. Расскажи подробнее!";
+    return;
+  }
+  setName(author);
+  $("fact-btn").disabled = true;
+  $("fact-btn").textContent = "ИИ сочиняет…";
+  box.textContent = "Придумываю вопросы, это займёт несколько секунд…";
+  try {
+    const res = await api("/facts", { method: "POST", body: JSON.stringify({ fact, author }) });
+    box.innerHTML = "";
+    if (res.accepted) {
+      box.classList.add("ok");
+      const p = document.createElement("p");
+      p.textContent = `Готово! В игру добавлено вопросов: ${res.questions.length}`;
+      const ul = document.createElement("ul");
+      for (const q of res.questions) {
+        const li = document.createElement("li");
+        li.textContent = q.q;
+        ul.append(li);
+      }
+      box.append(p, ul);
+      $("fact-text").value = "";
+      $("fact-count").textContent = "0/300";
+      await loadGenerated();
+      updateFoot();
+    } else {
+      box.classList.add("bad");
+      box.textContent = `Факт не принят: ${res.reason}`;
+    }
+  } catch (err) {
+    box.classList.add("bad");
+    box.textContent = err.message || "Не получилось. Попробуй ещё раз.";
+  } finally {
+    $("fact-btn").disabled = false;
+    $("fact-btn").textContent = "Добавить факт";
+  }
+});
+
+function updateFoot() {
+  $("foot").textContent = `В пуле ${questionPool().length} вопросов`;
+}
 
 $("share-btn").addEventListener("click", async () => {
   const data = { title: QUIZ.title, text: `Я набрал ${game.score}/${game.questions.length}. А ты знаешь Фила лучше?`, url: location.href };
@@ -242,6 +308,7 @@ $("share-btn").addEventListener("click", async () => {
 
 /* ---------- Запуск ---------- */
 $("player-name").value = getName();
-$("foot").textContent = `В пуле ${(window.QUESTIONS || []).length} вопросов`;
-await initStore();
+$("fact-block").hidden = !API;
+updateFoot();
 renderBoard($("board-start"));
+loadGenerated().then(updateFoot);

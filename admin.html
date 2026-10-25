@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Админка квиза</title>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .item { border-top: 1px solid var(--line); padding: 14px 0; }
+    .item:first-child { border-top: 0; }
+    .item .q { font-weight: 700; margin: 0 0 6px; }
+    .item .meta { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+    .item ul { margin: 4px 0 0; padding-left: 18px; }
+    .item li.ok { color: var(--green); }
+    .item .btn { padding: 8px 14px; font-size: 14px; margin-top: 8px; }
+    .tabs { display: flex; gap: 8px; margin: 16px 0; }
+    .tabs .btn.on { border-color: var(--gold); color: var(--gold); }
+    .fact.rejected { opacity: .7; }
+    .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); margin-right: 6px; }
+    .tag.accepted { color: var(--green); border-color: var(--green); }
+    .tag.rejected { color: var(--red); border-color: var(--red); }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <p class="kicker">админка</p>
+    <h1 style="font-size:32px">Вопросы от игроков</h1>
+
+    <form id="login" class="start-form">
+      <label for="token">Пароль администратора (ADMIN_TOKEN)</label>
+      <input id="token" type="password" required>
+      <button class="btn primary">Войти</button>
+    </form>
+
+    <div id="panel" hidden>
+      <div class="tabs">
+        <button class="btn on" data-tab="questions">Вопросы</button>
+        <button class="btn" data-tab="facts">Все факты</button>
+        <button class="btn" id="logout">Выйти</button>
+      </div>
+      <div class="board-block"><div id="list"></div></div>
+    </div>
+    <p class="muted small" id="status"></p>
+  </main>
+
+  <script type="module">
+    import { API_URL } from "./config.js";
+    const API = API_URL.replace(/\/+$/, "");
+    const $ = (id) => document.getElementById(id);
+    let token = "";
+    try { token = localStorage.getItem("phill_admin") || ""; } catch (_) {}
+    let tab = "questions";
+
+    async function api(path, opts = {}) {
+      const res = await fetch(API + path, { ...opts, headers: { Authorization: "Bearer " + token } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Ошибка");
+      return data;
+    }
+
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    };
+    const when = (ms) => new Date(ms).toLocaleString("ru-RU");
+
+    async function render() {
+      const list = $("list");
+      list.innerHTML = "";
+      $("status").textContent = "Загрузка…";
+      try {
+        if (tab === "questions") {
+          const { questions } = await api("/admin/questions");
+          if (!questions.length) list.append(el("p", "muted", "Пока нет вопросов от игроков."));
+          for (const q of questions) {
+            const item = el("div", "item");
+            item.append(el("p", "q", q.q));
+            const ul = el("ul");
+            ul.append(el("li", "ok", "✓ " + q.correct));
+            q.wrong.forEach((w) => ul.append(el("li", "", w)));
+            item.append(ul);
+            item.append(el("p", "meta", `Факт от ${q.author}: «${q.fact || "—"}» · ${when(q.createdAt)}`));
+            const del = el("button", "btn", "Удалить");
+            del.onclick = async () => {
+              if (!confirm("Удалить этот вопрос из игры?")) return;
+              await api(`/admin/questions/${q.id}`, { method: "DELETE" });
+              item.remove();
+            };
+            item.append(del);
+            list.append(item);
+          }
+          $("status").textContent = `Вопросов в игре от игроков: ${questions.length}`;
+        } else {
+          const { facts } = await api("/admin/facts");
+          if (!facts.length) list.append(el("p", "muted", "Фактов пока нет."));
+          for (const f of facts) {
+            const item = el("div", "item fact " + f.status);
+            const p = el("p", "q");
+            p.append(el("span", "tag " + f.status, f.status === "accepted" ? "принят" : "отклонён"), f.text);
+            item.append(p);
+            item.append(el("p", "meta", `${f.author} · ${when(f.created_at)}${f.reason ? " · " + f.reason : ""}`));
+            list.append(item);
+          }
+          $("status").textContent = `Фактов: ${facts.length}`;
+        }
+        $("login").hidden = true;
+        $("panel").hidden = false;
+      } catch (e) {
+        $("status").textContent = e.message;
+        $("login").hidden = false;
+        $("panel").hidden = true;
+      }
+    }
+
+    $("login").onsubmit = (e) => {
+      e.preventDefault();
+      token = $("token").value.trim();
+      try { localStorage.setItem("phill_admin", token); } catch (_) {}
+      render();
+    };
+    $("logout").onclick = () => {
+      token = "";
+      try { localStorage.removeItem("phill_admin"); } catch (_) {}
+      $("login").hidden = false;
+      $("panel").hidden = true;
+      $("status").textContent = "";
+    };
+    document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => {
+      tab = b.dataset.tab;
+      document.querySelectorAll("[data-tab]").forEach((x) => x.classList.toggle("on", x === b));
+      render();
+    });
+
+    if (!API) $("status").textContent = "Сервер ещё не подключён (API_URL в config.js пустой).";
+    else if (token) render();
+  </script>
+</body>
+</html>

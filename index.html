@@ -27,6 +27,19 @@
         <h2>Рейтинг</h2>
         <ol class="board" id="board-start"><li class="muted">Загрузка…</li></ol>
       </div>
+
+      <div class="board-block fact-block" id="fact-block" hidden>
+        <h2>Знаешь что-то о Филе?</h2>
+        <p class="muted small">Напиши факт, и ИИ сам придумает по нему смешные вопросы. Они сразу попадут в игру.</p>
+        <form id="fact-form" autocomplete="off">
+          <textarea id="fact-text" maxlength="300" rows="3" placeholder="Например: Фил однажды пошёл за хлебом и вернулся с новым билдом в POE" required></textarea>
+          <div class="fact-row">
+            <span class="muted small" id="fact-count">0/300</span>
+            <button type="submit" class="btn primary" id="fact-btn">Добавить факт</button>
+          </div>
+        </form>
+        <div id="fact-result" class="fact-result" hidden></div>
+      </div>
     </section>
 
     <!-- Вопрос -->
@@ -35,6 +48,7 @@
       <p class="kicker" id="q-counter">Вопрос 1 из 10</p>
       <h2 class="question" id="q-text"></h2>
       <div class="answers" id="answers"></div>
+      <p class="muted small author" id="q-author" hidden></p>
       <button class="btn primary next" id="next-btn" hidden>Дальше</button>
     </section>
 

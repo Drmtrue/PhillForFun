@@ -1,6 +1,4 @@
-// Настройки общего рейтинга (Firebase).
-// Пока firebase = null, рейтинг хранится только в этом браузере.
-// Чтобы рейтинг стал общим, вставьте сюда конфиг веб-приложения из Firebase.
+// Настройки квиза.
 
 export const QUIZ = {
   title: "Трансформация безрабочего",
@@ -8,14 +6,6 @@ export const QUIZ = {
   questionsPerGame: 10
 };
 
-export const firebase = null;
-/* Пример:
-export const firebase = {
-  apiKey: "...",
-  authDomain: "....firebaseapp.com",
-  projectId: "...",
-  storageBucket: "....appspot.com",
-  messagingSenderId: "...",
-  appId: "..."
-};
-*/
+// Адрес сервера на Cloudflare (например "https://phill-quiz-api.ИМЯ.workers.dev").
+// Пока пусто: рейтинг хранится только в браузере, а добавление фактов выключено.
+export const API_URL = "";

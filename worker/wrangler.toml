@@ -1,0 +1,21 @@
+name = "phill-quiz-api"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Одна база на всё: факты, вопросы, рейтинг (SQLite внутри Durable Object, есть в бесплатном плане)
+[[durable_objects.bindings]]
+name = "STORE"
+class_name = "QuizStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["QuizStore"]
+
+[vars]
+MODEL = "claude-sonnet-5-5"
+FACTS_PER_HOUR_PER_IP = "5"
+FACTS_PER_DAY_TOTAL = "100"
+
+# Секреты задаются в панели Cloudflare (Settings → Variables and secrets), не здесь:
+#   ANTHROPIC_API_KEY — ключ из console.anthropic.com
+#   ADMIN_TOKEN       — любой длинный пароль для страницы admin.html
