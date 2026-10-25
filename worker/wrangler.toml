@@ -21,3 +21,6 @@ FACTS_PER_DAY_TOTAL = "100"
 # Секреты задаются в панели Cloudflare (Settings → Variables and secrets), не здесь:
 #   ANTHROPIC_API_KEY — ключ из console.anthropic.com
 #   ADMIN_TOKEN       — любой длинный пароль для страницы admin.html
+
+[observability]
+enabled = true
