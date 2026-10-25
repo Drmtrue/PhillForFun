@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { generateQuestions } from "./generate.js";
+import { fetchDivinePrices } from "./prices.js";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -56,6 +57,11 @@ export default {
         const name = clean(url.searchParams.get("name"), 30);
         if (!name) return json({ error: "Нужно имя" }, 400);
         return json(await store.playerStats(name));
+      }
+
+      // Cheapest Divine Orb prices on FunPay (cached, refreshed at most every 20 minutes)
+      if (path === "/prices" && request.method === "GET") {
+        return json(await store.divinePrices(fetchDivinePrices));
       }
 
       // Side-court baskets (counted separately from quiz points)
@@ -182,6 +188,10 @@ export class QuizStore extends DurableObject {
           ts INTEGER NOT NULL
         )`,
       `CREATE INDEX IF NOT EXISTS hits_idx ON hits (key, kind, ts)`,
+      `CREATE TABLE IF NOT EXISTS kv (
+          k TEXT PRIMARY KEY,
+          v TEXT NOT NULL
+        )`,
       `CREATE TABLE IF NOT EXISTS baskets (
           name_key TEXT PRIMARY KEY,
           count INTEGER NOT NULL DEFAULT 0,
@@ -298,6 +308,41 @@ export class QuizStore extends DurableObject {
     const baskets = this.basketMap().get(k) || 0;
     if (!p) return { attempts: 0, points: 0, avg: 0, baskets };
     return { attempts: p.attempts, points: p.points, avg: Math.round((p.points / p.attempts) * 10) / 10, baskets };
+  }
+
+  // Price cache: refresh when older than 20 minutes; keep the previous value to show the trend
+  async divinePrices(fetcher) {
+    const TTL = 20 * 60 * 1000;
+    const row = this.sql.exec("SELECT v FROM kv WHERE k = 'divine2'").toArray()[0];
+    const cached = row ? JSON.parse(row.v) : null;
+    if (cached && Date.now() - cached.updatedAt < TTL) return cached;
+    // Only one refresh at a time; other callers get the cached copy meanwhile
+    if (this.refreshing) return cached || { prices: {}, updatedAt: 0, stale: true };
+    this.refreshing = true;
+    try {
+      const { prices, errors } = await fetcher();
+      const next = { prices: {}, updatedAt: Date.now(), errors };
+      for (const k of ["poe1", "poe2"]) {
+        const now = prices[k];
+        const before = cached?.prices?.[k];
+        if (now) {
+          // Previous price for the trend arrow; it only changes when the price actually moves
+          // and is reset when the league changes (new league = new economy)
+          const same = before && before.league === now.league && before.price != null;
+          const prev = same ? (before.price !== now.price ? before.price : before.prev ?? null) : null;
+          next.prices[k] = { ...now, prev };
+        } else if (before) {
+          next.prices[k] = { ...before, stale: true };
+        }
+      }
+      this.sql.exec("INSERT INTO kv (k, v) VALUES ('divine2', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", JSON.stringify(next));
+      return next;
+    } catch (e) {
+      console.error("prices", e);
+      return cached ? { ...cached, stale: true } : { prices: {}, updatedAt: 0, stale: true };
+    } finally {
+      this.refreshing = false;
+    }
   }
 
   basketMap() {

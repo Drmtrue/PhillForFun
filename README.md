@@ -46,6 +46,7 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | `GET` | `/scores` | Leaderboard: attempts, total points, average and achievement count per player, sorted by average |
 | `GET` | `/player?name=` | One player's attempts, points, average and side-court baskets |
 | `POST` | `/baskets` | Add side-court baskets `{ name, add }` (counted separately from quiz points) |
+| `GET` | `/prices` | Cheapest Divine Orb (PoE 1 / PoE 2) on FunPay in rubles: current league, online sellers only; cached 20 min |
 | `GET` | `/achievements?name=` | Achievement ids unlocked by a player |
 | `POST` | `/achievements` | Unlock achievements `{ name, ids: [...] }` |
 | `POST` | `/scores` | Save a result `{ name, score, total }` |
@@ -74,3 +75,12 @@ Defined in `achievements.js` (`id`, `icon`, `title`, `desc`, optional `secret` +
 ## Side-court mini-game
 
 On screens wider than ~1100px a hoop appears in the empty space left or right of the quiz. The ball lies at the bottom of the viewport; drag it with the mouse (or finger) and release to throw. A basket adds one point to a separate counter (top-left HUD, leaderboard 🏀), and the hoop moves to a new random spot after every throw. Releasing the ball above the rim is a dunk and does not count. Add `?debug` to the URL to expose `window.__hoop` for automated checks.
+
+## RMT exchange widget
+
+The "Биржа РМТ" panel shows the cheapest price for 1 Divine Orb on FunPay for PoE 1 and PoE 2 (`worker/src/prices.js`):
+
+- only the current main league (event, Standard, Hardcore and Ruthless leagues are skipped; PoE 1 uses the PC league);
+- only offers from sellers who are online at the moment of the check;
+- prices in rubles: the server asks FunPay for ruble prices via its currency switch; if FunPay does not offer rubles for the server's location, it converts using the Central Bank of Russia daily rate and the page says so;
+- refreshed at most every 20 minutes, with a trend arrow when the price moves.

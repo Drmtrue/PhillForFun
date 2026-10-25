@@ -1,5 +1,5 @@
-import { QUIZ, API_URL } from "./config.js?v=202610251154";
-import { initHoop } from "./hoop.js?v=202610251154";
+import { QUIZ, API_URL } from "./config.js?v=202610251211";
+import { initHoop } from "./hoop.js?v=202610251211";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -875,6 +875,76 @@ function bumpIdle() {
 }
 ["mousemove", "pointerdown", "scroll", "touchstart"].forEach((ev) => document.addEventListener(ev, bumpIdle, { passive: true }));
 
+/* ---------- RMT exchange: cheapest Divine Orb on FunPay ---------- */
+const fmtPrice = (x) => x.toLocaleString("ru-RU", { maximumSignificantDigits: 3 });
+
+function minutesAgo(ts) {
+  const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (m < 1) return "только что";
+  if (m < 60) return `${m} мин назад`;
+  const h = Math.round(m / 60);
+  return `${h} ${plural(h, "час", "часа", "часов")} назад`;
+}
+
+async function loadPrices() {
+  if (!API) return;
+  try {
+    const data = await api("/prices");
+    const rows = [["poe1", "PoE 1"], ["poe2", "PoE 2"]]
+      .map(([key, short]) => data.prices?.[key] && { short, ...data.prices[key] })
+      .filter(Boolean);
+    if (!rows.length) return;
+    const box = $("rmt-rows");
+    box.innerHTML = "";
+    let converted = null;
+    for (const r of rows) {
+      if (r.source === "cbr" && r.original) converted = r;
+      const a = document.createElement("a");
+      a.className = "rmt-row";
+      a.href = r.url;
+      a.target = "_blank";
+      a.rel = "noopener";
+      const left = document.createElement("div");
+      left.className = "rmt-game";
+      const b = document.createElement("b");
+      b.textContent = r.short;
+      const lg = document.createElement("span");
+      lg.textContent = r.league.replace(/^\(PC\)\s*/, "");
+      const on = document.createElement("span");
+      on.className = "rmt-online";
+      on.textContent = `продавцов онлайн: ${r.onlineOffers} из ${r.offers}`;
+      left.append(b, lg, on);
+
+      const right = document.createElement("div");
+      right.className = "rmt-price";
+      const price = document.createElement("span");
+      price.className = "rmt-num";
+      price.textContent = r.price != null ? `${fmtPrice(r.price)} ₽` : "—";
+      right.append(price);
+      if (r.price != null && r.prev) {
+        const diff = ((r.price - r.prev) / r.prev) * 100;
+        const t = document.createElement("span");
+        // Phil sells, so a rising price is good news
+        t.className = "rmt-trend " + (diff >= 0 ? "up" : "down");
+        t.textContent = `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff).toFixed(1)}%`;
+        right.append(t);
+      }
+      const sub = document.createElement("span");
+      sub.className = "rmt-sub";
+      sub.textContent = r.price != null
+        ? `100 шт ≈ ${fmtPrice(r.price * 100)} ₽`
+        : "сейчас нет продавцов онлайн";
+      right.append(sub);
+      a.append(left, right);
+      box.append(a);
+    }
+    $("rmt-upd").textContent = data.updatedAt ? `FunPay · ${minutesAgo(data.updatedAt)}` : "FunPay";
+    $("rmt-note").textContent = "Самая низкая цена за 1 Divine Orb у продавцов онлайн в текущей лиге. Обновляется раз в 20 минут." +
+      (converted ? ` FunPay показывает цены в ${converted.original.unit}, пересчитано по курсу ЦБ: 1 ${converted.original.unit} = ${fmtPrice(converted.rate)} ₽.` : "");
+    $("rmt").hidden = false;
+  } catch (e) { console.error(e); }
+}
+
 /* ---------- Side-court baskets (separate from quiz points) ---------- */
 const BASKET_KEY = "phill_quiz_baskets";
 let baskets = 0;
@@ -936,3 +1006,5 @@ syncAch(getName()); // also syncs baskets
 bumpIdle();
 renderBoard($("board-start"));
 loadGenerated().then(updateFoot);
+loadPrices();
+setInterval(loadPrices, 10 * 60 * 1000);
