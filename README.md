@@ -92,6 +92,8 @@ Below the prices is a savings goal (`RMT_GOAL` in `config.js`: a new PC for 250 
 
 ### Season forecast
 
+The goal block is collapsed by default to a one-line summary (goal, price and the estimated month per game) with a "Подробнее ▾" toggle; the open/closed state is remembered per browser.
+
 `rmtmodel.js` turns the current price into a season-aware forecast, using the league calendar in `SEASONS` (`config.js`):
 
 - **Price curve:** `p(d) = floor · (1 + (k − 1) · e^(−d/τ))` for day `d` of the league. With fewer than 5 days of real history the shape comes from `RMT_MODEL` (k = 3, τ = 10 days, an assumption — no public RMT price history exists) and only the floor is solved from today's price; with 5+ days the server's real daily prices are fitted (grid search over k and τ, closed-form floor in log space).

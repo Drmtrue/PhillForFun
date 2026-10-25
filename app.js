@@ -1,7 +1,7 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251407";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, MIN_POINTS } from "./rmtmodel.js?v=202610251407";
-import { initHoop } from "./hoop.js?v=202610251407";
-import { freeThrow } from "./freethrow.js?v=202610251407";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251419";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, MIN_POINTS } from "./rmtmodel.js?v=202610251419";
+import { initHoop } from "./hoop.js?v=202610251419";
+import { freeThrow } from "./freethrow.js?v=202610251419";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -1046,21 +1046,37 @@ function priceChart(model, season, history) {
   <div class="pc-axis"><span>старт</span><span><i class="pc-dot now"></i>сегодня<i class="pc-dot real"></i>факт</span><span>конец</span></div>`;
 }
 
+const GOAL_OPEN_KEY = "phill_quiz_goal_open";
+
 function renderGoal(rows) {
   const box = $("rmt-goal");
   const priced = rows.filter((r) => r.price);
   if (!RMT_GOAL || !priced.length) { box.hidden = true; return; }
   box.innerHTML = "";
 
-  const head = document.createElement("div");
-  head.className = "goal-head";
+  // Collapsible: a one-line summary with an explicit "details" pill; the open/closed state is remembered
+  const details = document.createElement("details");
+  details.className = "goal-details";
+  details.open = store.get(GOAL_OPEN_KEY, false);
+  details.addEventListener("toggle", () => store.set(GOAL_OPEN_KEY, details.open));
+  const summary = document.createElement("summary");
+  summary.className = "goal-summary";
+  const sLeft = document.createElement("div");
+  sLeft.className = "goal-summary-text";
   const t = document.createElement("b");
-  t.textContent = `🎯 Цель: ${RMT_GOAL.title}`;
-  const sum = document.createElement("span");
-  sum.className = "goal-sum";
-  sum.textContent = `${fmtInt(RMT_GOAL.priceRub)} ₽`;
-  head.append(t, sum);
-  box.append(head);
+  t.textContent = `🎯 Цель: ${RMT_GOAL.title} · ${fmtInt(RMT_GOAL.priceRub)}\u00a0₽`;
+  const etaLine = document.createElement("span");
+  etaLine.className = "goal-summary-eta";
+  sLeft.append(t, etaLine);
+  const pill = document.createElement("span");
+  pill.className = "goal-toggle";
+  pill.innerHTML = '<span class="when-closed">Подробнее</span><span class="when-open">Свернуть</span><i aria-hidden="true">▾</i>';
+  summary.append(sLeft, pill);
+  const body = document.createElement("div");
+  body.className = "goal-body";
+  details.append(summary, body);
+  box.append(details);
+  const etas = [];
 
   let anyEstimate = false;
   for (const r of priced) {
@@ -1107,8 +1123,10 @@ function renderGoal(rows) {
     chart.innerHTML = priceChart(model, season, r.history);
     d.append(chart);
     card.append(g, d);
-    box.append(card);
+    body.append(card);
+    if (fc.goalAt) etas.push(`${r.short}: ПК\u00a0≈ ${fmtMonthYear(fc.goalAt)}`);
   }
+  etaLine.textContent = etas.length ? etas.join(" · ") : "считаю…";
 
   const note = document.createElement("p");
   note.className = "goal-note";
@@ -1119,7 +1137,7 @@ function renderGoal(rows) {
       ? `Кривая цены пока оценочная: публичной истории RMT-цен нет, поэтому принято, что на старте Divine стоит ×${RMT_MODEL.k} от поздней цены и наценка спадает за ~${RMT_MODEL.tau} дней. Сервер записывает реальные цены каждый день; с ${MIN_POINTS}+ дней данных кривая строится по ним.`
       : `Кривая цены построена по реальным ежедневным ценам FunPay за этот сезон.`) +
     ` Продажа по самой низкой цене FunPay, без учёта комиссии.`;
-  box.append(note);
+  body.append(note);
   box.hidden = false;
 }
 
