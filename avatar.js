@@ -132,6 +132,43 @@ const LINES = {
   endGood: { mood: "happy", pri: 3, lines: ["Неплохо. С пивком потянет.", "Почти идеально, как и я."] },
   endBad: { mood: "sad", pri: 3, lines: ["МДА.. Мы точно знакомы?", "Это тебе не диваны на фанпее покупать."] },
   endZero: { mood: "shock", pri: 3, lines: ["Ноль? Ты вообще кто?", "Ноль. Даже я на работе дольше продержался."] },
+  shootStart: {
+    mood: "smug", pri: 1, chance: 0.6, lines: [
+      "Отойдите, профи работает.",
+      "Смотрите и учитесь.",
+      "Ща покажу, как надо.",
+      "Мяч скучает. Сейчас исправим."
+    ]
+  },
+  // Phil missed his own shot: everything and everyone is to blame
+  blame: {
+    mood: "sad", pri: 3, lines: [
+      "Мяч кривой! Кто его вообще надувал?",
+      "Это кольцо двигается, я видел!",
+      "Ветер. Определённо ветер.",
+      "Лаги! У меня пинг 300!",
+      "Солнце в глаза, честно.",
+      "Пол скользкий, кто тут разлил аджику?",
+      "Это всё вы, отвлекаете!",
+      "Кольцо на сантиметр выше нормы, я замерял.",
+      "Кроссовки не те. В Джорданах бы попал.",
+      "Админ подкрутил физику, сто процентов.",
+      "Монитор у тебя кривой, вот и промазал я.",
+      "Это FunPay виноват. И диваны. Всё из-за диванов."
+    ]
+  },
+  // Phil made it (5% chance): smoke, shades, and a word for the noobs
+  pwned: {
+    mood: "smug", pri: 3, lines: [
+      "Учитесь, нубы. Вот так играет x23x.",
+      "5% шанс? Для меня это 100%.",
+      "Вы все нубы по сравнению со мной. MJ бы плакал.",
+      "Изи. Даже без разминки.",
+      "Скриньте, нубяры. Такое раз в жизни.",
+      "Кто там говорил, что я не умею? Нубы.",
+      "Вам до меня как до работы. Мне. Далеко."
+    ]
+  },
   smoke: { mood: "smug", pri: 0, chance: 0.5, lines: ["Перекур.", "Пошёл дым.", "Вот теперь можно и подумать."] }
 };
 
@@ -234,7 +271,7 @@ const SVG = `
 </svg>`;
 
 // Body movement per event for the 3D Phil (falls back to the event's mood)
-const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug" };
+const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug", blame: "angry", pwned: "smug" };
 
 export function initAvatar() {
   const root = document.createElement("div");
@@ -249,7 +286,7 @@ export function initAvatar() {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251450")
+  import("./phil3d.js?v=202610251504")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, { bubble, onClick: () => say("click", { force: true }) });
       root.classList.add("phil-3d");
@@ -290,7 +327,29 @@ export function initAvatar() {
       root.dataset.mood = "neutral";
     });
   }
-  const isSmoking = () => (body3d ? body3d.smoking : smoking);
+  const isSmoking = () => (body3d ? body3d.busy : smoking);
+
+  // ----- Phil shoots at the side-court hoop now and then (5% to make it)
+  const MAKE_CHANCE = 0.05;
+  let court = null;
+  function tryShot(make = Math.random() < MAKE_CHANCE) {
+    if (!body3d || !court || !court.enabled || document.hidden || body3d.busy || document.querySelector(".ft-overlay")) return false;
+    if (!body3d.shoot(court, make)) return false;
+    say("shootStart");
+    return true;
+  }
+  (function scheduleShot() {
+    setTimeout(() => { tryShot(); scheduleShot(); }, 50000 + Math.random() * 70000);
+  })();
+  function courtResult(made) {
+    if (!body3d) return;
+    if (!made) { say("blame", { force: true }); return; }
+    body3d.react("happy");
+    setTimeout(() => body3d.smoke(), 1300);
+    setTimeout(() => body3d.glasses(true), 1300 + 2800);
+    setTimeout(() => say("pwned", { force: true }), 1300 + 3300);
+    setTimeout(() => body3d.glasses(false), 1300 + 12500);
+  }
 
   // Shows a line for an event. Lower-priority events do not interrupt a more important line,
   // and minor events are rate-limited so Phil does not talk over every click.
@@ -349,5 +408,5 @@ export function initAvatar() {
     }, 2500 + Math.random() * 4000);
   })();
 
-  return { say, smoke, el: root };
+  return { say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot };
 }

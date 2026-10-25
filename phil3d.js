@@ -177,11 +177,26 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
     p.userData = { life: 0, max: 2 + Math.random() * 0.8, vx: 0.08 + Math.random() * 0.12, vy: 0.32 + Math.random() * 0.15, s: strength };
   }
 
+  // Basketball he carries and shoots (the side-court ball while he holds it)
+  const ball = add(sphere(0.31, 32, 24), std(0xffffff, { roughness: 0.6, map: ballTexture() }), hips, [0, 0.4, 0.62]);
+  ball.visible = false;
+
+  // Sunglasses that drop onto his face after a lucky basket
+  const shades = group(head, [0, 0.12, 0.6]);
+  const lensMat = std(0x0b0b10, { roughness: 0.12, metalness: 0.4 });
+  for (const s of [-1, 1]) {
+    add(new THREE.CylinderGeometry(0.17, 0.15, 0.05, 28), lensMat, shades, [s * 0.22, 0, 0.05], [1.2, 1, 0.85], [Math.PI / 2, 0, 0]);
+    add(new THREE.PlaneGeometry(0.05, 0.16), basic(0xffffff, { transparent: true, opacity: 0.35 }), shades, [s * 0.22 - 0.06, 0.02, 0.08], null, [0, 0, -0.6]);
+    add(new THREE.BoxGeometry(0.035, 0.035, 0.6), lensMat, shades, [s * 0.6, 0.02, -0.28]);
+  }
+  add(new THREE.BoxGeometry(0.16, 0.035, 0.035), lensMat, shades, [0, 0.05, 0.06]);
+  shades.visible = false;
+
   // ----- State
   const st = {
     x: 0, target: 0, pause: 1.5, dir: 1, phase: 0, facing: 0, t: 0,
     react: null, reactT: 0, smokeT: -1, nextPuff: 0, blinkAt: 2, blinkT: -1,
-    look: 0, mouseX: null
+    look: 0, mouseX: null, task: null, shades: 0, shadesOn: false
   };
   const J = { // smoothed joint values
     armRX: [0, 0], armRZ: [-0.15, 0.15], legX: [0, 0], headX: 0, headY: 0, headZ: 0,
@@ -212,17 +227,27 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
   document.addEventListener("pointermove", (e) => { st.mouseX = e.clientX; }, { passive: true });
   layout();
 
-  const REACT_LEN = { happy: 1.2, sad: 2.2, shock: 1.2, smug: 1.8, wave: 1.6, neutral: 0.1 };
+  const REACT_LEN = { happy: 1.2, sad: 2.2, shock: 1.2, smug: 1.8, wave: 1.6, angry: 2.2, neutral: 0.1 };
   function react(kind) {
+    if (st.task) return; // busy with the ball
     st.react = REACT_LEN[kind] ? kind : "neutral";
     st.reactT = 0;
     st.facing = 0;
   }
   function smoke() {
-    if (st.smokeT >= 0) return;
+    if (st.smokeT >= 0 || st.task) return;
     st.smokeT = 0;
     st.nextPuff = 2.6;
   }
+
+  // Walk to the side-court ball, carry it to a spot facing the hoop, and take a jump shot.
+  // The court decides where it lands; make = true aims for the rim center.
+  function shoot(court, make) {
+    if (st.task || st.react || st.smokeT >= 0 || !court.ballAvailable()) return false;
+    st.task = { court, make, phase: "toBall", t: 0, targetX: court.ballPos().x - W / 2 };
+    return true;
+  }
+  const clampX = (x) => { const [a, b] = range(); return Math.min(b, Math.max(a, x)); };
 
   const lerp = (a, b, k) => a + (b - a) * k;
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -242,9 +267,28 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
     if (smoking) st.smokeT += dt;
     const lighting = smoking && st.smokeT < 2.6;
 
+    // Shot task: walking phases override wandering
+    const task = st.task;
+    if (task) {
+      task.t += dt;
+      if (task.phase === "toBall" && !task.court.ballAvailable()) { st.task = null; }      // someone else took it
+    }
+    const goal = task && (task.phase === "toBall" || task.phase === "carry") ? task.targetX : null;
+
     // Wandering
     let walking = false;
-    if (!reduced && !st.react && !smoking) { // a smoke break is a break: he stands still
+    if (goal != null) {
+      const dx = goal - st.x;
+      if (Math.abs(dx) < 3) {
+        task.phase = task.phase === "toBall" ? "pickup" : "aim";
+        task.t = 0;
+      } else {
+        walking = true;
+        st.dir = Math.sign(dx);
+        st.x += st.dir * Math.min(Math.abs(dx), SPEED * 1.5 * dt);
+      }
+      st.target = st.x;
+    } else if (!reduced && !st.react && !smoking && !st.task) { // a smoke break is a break: he stands still
       const dx = st.target - st.x;
       if (Math.abs(dx) < 2) {
         st.pause -= dt;
@@ -314,11 +358,82 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
         T.headZ = 0.14;
         T.back = 0.05;
         break;
+      case "angry":
+        mood = "angry";
+        T.armRZ = [-0.55 + Math.sin(r * 22) * 0.18, 0.55 - Math.sin(r * 22) * 0.18]; // shaking fists
+        T.armRX = [-0.5, -0.5];
+        T.headY = Math.sin(r * 9) * 0.35;                                           // head shake
+        T.legX = r < 0.9 ? [Math.max(0, Math.sin(r * 14)) * -0.45, 0] : [0, 0];   // stomping
+        T.back = 0.05;
+        break;
       case "wave":
         mood = "happy";
         T.armRZ = [-2.75 + Math.sin(r * 12) * 0.35, 0.18];
         T.headZ = -0.08;
         break;
+    }
+
+    if (st.task) {
+      const k2 = st.task, tt = k2.t;
+      if (k2.phase === "pickup") {
+        face = 0;
+        const bend = Math.sin(Math.min(1, tt / 0.7) * Math.PI);
+        T.hipsY -= 0.14 * bend;
+        T.lean = 0.45 * bend;
+        T.armRX = [-0.9 * bend, -0.9 * bend];
+        T.armRZ = [0.25 * bend - 0.15, -0.25 * bend + 0.15];
+        if (tt > 0.35 && !ball.visible) {
+          if (k2.court.npcTake()) ball.visible = true;
+          else st.task = null;
+        }
+        if (st.task && tt > 0.75) {
+          // Carry it to a spot on the open side of the hoop
+          const h = k2.court.hoopInfo();
+          const rimC = h.x + h.rimW / 2;
+          const open = h.side === "left" ? 1 : -1;
+          k2.rimC = rimC;
+          k2.targetX = clampX(rimC + open * (150 + Math.random() * 120) - W / 2);
+          k2.phase = "carry";
+          k2.t = 0;
+        }
+      }
+      if (k2.phase === "carry") {
+        T.armRX = [-1.15, -1.15];
+        T.armRZ = [0.4, -0.4];
+        ball.position.set(0, 0.42, 0.62);
+      }
+      if (k2.phase === "aim" || k2.phase === "follow") {
+        face = Math.sign(k2.rimC - (st.x + W / 2)) * 0.75;
+        mood = "smug";
+      }
+      if (k2.phase === "aim") {
+        const up = ease(tt / 0.5);
+        T.armRX = [lerp(-1.15, -2.75, up), lerp(-1.15, -2.75, up)];
+        T.armRZ = [0.4 - 0.2 * up, -0.4 + 0.2 * up];
+        ball.position.set(0, lerp(0.42, 2.25, up), lerp(0.62, 0.15, up));
+        T.headX = -0.25 * up;
+        T.hipsY -= tt < 0.5 ? 0.08 * up : 0;
+        if (tt > 0.5) T.jump = Math.sin(Math.min(1, (tt - 0.5) / 0.55) * Math.PI) * 0.3;
+        if (tt > 0.72) {
+          // Release: hand the ball to the court at its current screen position
+          ball.getWorldPosition(tmp);
+          tmp.project(camera);
+          const rect = canvas.getBoundingClientRect();
+          k2.court.npcThrow(rect.left + ((tmp.x + 1) / 2) * rect.width, rect.top + (1 - (tmp.y + 1) / 2) * rect.height, k2.make);
+          ball.visible = false;
+          k2.phase = "follow";
+          k2.t = 0;
+        }
+      }
+      if (k2.phase === "follow") {
+        T.armRX = [-2.3, -2.3];
+        T.armRZ = [0.15, -0.15];
+        T.headX = -0.2;
+        T.jump = tt < 0.3 ? Math.sin((0.5 + tt / 0.6) * Math.PI) * 0.3 : 0;
+        if (tt > 1.3) st.task = null;
+      }
+    } else if (ball.visible) {
+      ball.visible = false;
     }
 
     // Smoke break: light up, then puff away (he may wander again once it is lit)
@@ -381,9 +496,16 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
     for (const b of brows) {
       const s = b.userData.side;
       b.position.y = 0.34 + (mood === "shock" ? 0.07 : mood === "sad" ? 0.02 : 0);
-      b.rotation.z = mood === "sad" ? s * -0.3 : mood === "smug" ? (s > 0 ? 0.25 : -0.05) : mood === "happy" ? s * 0.12 : 0;
+      b.rotation.z = mood === "sad" ? s * -0.3 : mood === "angry" ? s * 0.38 : mood === "smug" ? (s > 0 ? 0.25 : -0.05) : mood === "happy" ? s * 0.12 : 0;
+      if (mood === "angry") b.position.y = 0.3;
     }
-    setMouth(mood);
+    setMouth(mood === "angry" ? "sad" : mood);
+    M.skin.color.setHex(mood === "angry" ? 0xf6aa8e : COLORS.skin); // red in the face
+
+    // Sunglasses slide down from above and sit on the eyes
+    st.shades = lerp(st.shades, st.shadesOn ? 1 : 0, 1 - Math.exp(-dt * 7));
+    shades.visible = st.shades > 0.02;
+    shades.position.y = 0.12 + (1 - st.shades) * 1.4;
 
     // Smoke particles
     for (const p of puffs) {
@@ -421,7 +543,30 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
   }
 
   requestAnimationFrame(frame);
-  return { react, smoke, get smoking() { return st.smokeT >= 0; }, get puffs() { return puffs.filter((p) => p.visible).length; } };
+  return {
+    react, smoke, shoot,
+    glasses(on) { st.shadesOn = on; },
+    get busy() { return !!st.task || st.smokeT >= 0 || !!st.react; },
+    get smoking() { return st.smokeT >= 0; }, get puffs() { return puffs.filter((p) => p.visible).length; }
+  };
+}
+
+// Orange basketball with black seams (equirectangular map)
+function ballTexture() {
+  const c = document.createElement("canvas");
+  c.width = 256; c.height = 128;
+  const g = c.getContext("2d");
+  g.fillStyle = "#d9681e";
+  g.fillRect(0, 0, 256, 128);
+  for (let i = 0; i < 900; i++) { g.fillStyle = "rgba(120,40,0,.18)"; g.fillRect(Math.random() * 256, Math.random() * 128, 1.5, 1.5); }
+  g.strokeStyle = "#241005";
+  g.lineWidth = 3;
+  g.beginPath(); g.moveTo(0, 64); g.lineTo(256, 64); g.stroke();
+  for (const x of [64, 192]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 128); g.stroke(); }
+  for (const x of [0, 128, 256]) { g.beginPath(); g.ellipse(x, 64, 34, 64, 0, 0, Math.PI * 2); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // Red "23" for the shirt

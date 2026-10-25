@@ -1,4 +1,4 @@
-import { spinDetector, drawFace } from "./ballskin.js?v=202610251450";
+import { spinDetector, drawFace } from "./ballskin.js?v=202610251504";
 
 // Side-court mini-game: a hoop appears in the empty space left or right of the quiz column,
 // the ball lies at the bottom of the viewport, and the player drags and flings it into the hoop.
@@ -13,7 +13,7 @@ const GRAVITY = 1900;        // px/s^2
 const MAX_SPEED = 2600;      // px/s cap on throws
 const FLOOR_PAD = 14;        // ball rests this far above the viewport bottom
 
-export function initHoop({ onBasket, onMiss, onDunk, sound }) {
+export function initHoop({ onBasket, onMiss, onDunk, onNpcBasket, onNpcMiss, sound }) {
   const canvas = document.createElement("canvas");
   canvas.className = "hoop-layer";
   canvas.setAttribute("aria-hidden", "true");
@@ -23,8 +23,8 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
   let vw = 0, vh = 0, dpr = 1, enabled = false;
   let zones = null;          // { left: [x0, x1], right: [x0, x1] }
   let hoop = null;           // { side, x, y, board }
-  const ball = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, state: "rest" }; // rest | drag | flight | reset
-  let throwInfo = null;      // { scored, dunk, t0, settledAt }
+  const ball = { x: 0, y: 0, vx: 0, vy: 0, angle: 0, state: "rest" }; // rest | drag | flight | reset | npc (held by Phil)
+  let throwInfo = null;      // { scored, dunk, npc, t0, settledAt }
   let trail = [];            // recent pointer samples while dragging
   const spin = spinDetector(); // fast loops while holding the ball swap the skin
   let netWobble = 0;
@@ -78,7 +78,8 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
   const onBall = (x, y) => enabled && Math.hypot(x - ball.x, y - ball.y) <= R + 10;
 
   document.addEventListener("pointerdown", (e) => {
-    if (!onBall(e.clientX, e.clientY) || ball.state === "reset") return;
+    if (!onBall(e.clientX, e.clientY) || ball.state === "reset" || ball.state === "npc") return;
+    if (ball.state === "flight" && throwInfo && throwInfo.npc) return; // Phil's shot is his own
     e.preventDefault();
     e.stopPropagation();
     ball.state = "drag";
@@ -171,7 +172,10 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
         netWobble = 1;
         ball.vx *= 0.3;
         ball.vy = Math.min(ball.vy, 380);
-        if (throwInfo.dunk) {
+        if (throwInfo.npc) {
+          pops.push({ x: hoop.x + RIM_W / 2, y: hoop.y - 30, text: "ФИЛ!", t: 0 });
+          onNpcBasket && onNpcBasket();
+        } else if (throwInfo.dunk) {
           pops.push({ x: hoop.x + RIM_W / 2, y: hoop.y - 30, text: "Данк не засчитан", t: 0, bad: true });
           onDunk && onDunk();
         } else {
@@ -197,13 +201,54 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
     const settled = ball.vy === 0 && Math.abs(ball.vx) < 14;
     if ((settled || now - throwInfo.t0 > 5000) && !throwInfo.settledAt) {
       throwInfo.settledAt = now;
-      if (!throwInfo.scored && !throwInfo.dunk && onMiss) onMiss();
+      if (!throwInfo.scored && throwInfo.npc) onNpcMiss && onNpcMiss();
+      else if (!throwInfo.scored && !throwInfo.dunk && onMiss) onMiss();
       ball.state = "reset";
       setTimeout(() => {
         placeHoop();       // new hoop position after every throw
         restBall();
       }, throwInfo.scored ? 450 : 650);
     }
+  }
+
+  // Silent copy of the physics above: would a throw from (x, y) with this velocity score?
+  function simulate(x, y, vx, vy, dt) {
+    const b = { x, y, vx, vy };
+    const dot = (px, py) => {
+      const dx = b.x - px, dy = b.y - py, d = Math.hypot(dx, dy), min = R + RIM_DOT;
+      if (d >= min || d === 0) return;
+      const nx = dx / d, ny = dy / d;
+      b.x = px + nx * min;
+      b.y = py + ny * min;
+      const vn = b.vx * nx + b.vy * ny;
+      if (vn < 0) { b.vx -= 1.5 * vn * nx; b.vy -= 1.5 * vn * ny; }
+    };
+    const floor = vh - FLOOR_PAD;
+    for (let t = 0; t < 5; t += dt) {
+      const prevY = b.y;
+      b.vy += GRAVITY * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      if (b.x < R) { b.x = R; b.vx = Math.abs(b.vx) * 0.6; }
+      if (b.x > vw - R) { b.x = vw - R; b.vx = -Math.abs(b.vx) * 0.6; }
+      if (b.y < -400) b.vy = Math.abs(b.vy) * 0.3;
+      const top = hoop.y - 78, bottom = hoop.y + 16, bx = hoop.boardX;
+      if (b.y + R > top && b.y - R < bottom) {
+        if (hoop.side === "left" && b.x - R < bx && b.x > bx - 6) { b.x = bx + R; b.vx = Math.abs(b.vx) * 0.55; }
+        if (hoop.side === "right" && b.x + R > bx && b.x < bx + 6) { b.x = bx - R; b.vx = -Math.abs(b.vx) * 0.55; }
+      }
+      dot(hoop.x, hoop.y);
+      dot(hoop.x + RIM_W, hoop.y);
+      if (prevY < hoop.y && b.y >= hoop.y && b.vy > 0 && b.x > hoop.x + 4 && b.x < hoop.x + RIM_W - 4) return true;
+      if (b.y + R > floor) {
+        b.y = floor - R;
+        b.vy = -b.vy * 0.55;
+        b.vx *= 0.86;
+        if (Math.abs(b.vy) < 70) b.vy = 0;
+      }
+      if (b.vy === 0 && Math.abs(b.vx) < 14) return false;
+    }
+    return false;
   }
 
   // ----- Drawing
@@ -298,8 +343,9 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
         g.globalAlpha = 1;
       }
       // Ball goes in front of the back rim and behind the net/front rim when it is inside the hoop
-      const inside = hoop && ball.y > hoop.y - R && ball.y < hoop.y + 50 && ball.x > hoop.x - R && ball.x < hoop.x + RIM_W + R;
-      if (!inside) drawBall();
+      const shown = ball.state !== "npc";
+      const inside = shown && hoop && ball.y > hoop.y - R && ball.y < hoop.y + 50 && ball.x > hoop.x - R && ball.x < hoop.x + RIM_W + R;
+      if (shown && !inside) drawBall();
       if (hoop) {
         g.globalAlpha = Math.min(1, (now - hoop.born) / 300);
         if (inside) drawBall();
@@ -322,6 +368,50 @@ export function initHoop({ onBasket, onMiss, onDunk, sound }) {
   layout();
   requestAnimationFrame(frame);
 
-  // Test hook: lets automated checks inspect state without touching the UI
-  return { get state() { return { enabled, hoop: hoop && { ...hoop }, ball: { ...ball } }; } };
+  // ----- Phil (the mascot) plays too: he takes the resting ball and throws it from a screen point.
+  // make = true aims at the rim center so the ball drops in; otherwise the aim is off by enough to miss.
+  const court = {
+    get enabled() { return enabled; },
+    ballAvailable: () => enabled && ball.state === "rest",
+    ballPos: () => ({ x: ball.x, y: ball.y }),
+    hoopInfo: () => hoop && { x: hoop.x, y: hoop.y, side: hoop.side, rimW: RIM_W },
+    npcTake() {
+      if (!enabled || ball.state !== "rest") return false;
+      ball.state = "npc";
+      return true;
+    },
+    npcCancel() { if (ball.state === "npc") restBall(); },
+    npcThrow(x, y, make) {
+      if (ball.state !== "npc" || !hoop) return;
+      const y0 = Math.min(y, vh - FLOOR_PAD - R);
+      // Try trajectories and keep one whose simulated outcome matches the plan (checked at three step sizes,
+      // so the frame rate does not flip it). Rim and backboard bounces make plain aiming unreliable.
+      let pick = null, fallback = null;
+      for (let i = 0; i < 40 && !pick; i++) {
+        let tx = hoop.x + RIM_W / 2, ty = hoop.y;
+        if (make) tx += rand(-6, 6);
+        else {
+          tx += (Math.random() < 0.5 ? -1 : 1) * rand(45, 140);   // short into the front rim, or long off the board
+          ty += rand(-60, 10);
+        }
+        const dx = tx - x, dy = ty - y0;
+        // Flight time: long enough that the ball is already falling when it reaches the rim
+        const T = Math.min(1.8, Math.max(0.9 + Math.abs(dx) / 900, Math.sqrt((2 * Math.max(0, -dy)) / GRAVITY) * rand(1.15, 1.45)));
+        const v = { vx: dx / T, vy: dy / T - 0.5 * GRAVITY * T };
+        fallback = fallback || v;
+        if ([1 / 240, 1 / 120, 1 / 576].every((dt) => simulate(x, y0, v.vx, v.vy, dt) === make)) pick = v;
+      }
+      const v = pick || fallback;
+      ball.x = x;
+      ball.y = y0;
+      ball.vx = v.vx;
+      ball.vy = v.vy;
+      ball.state = "flight";
+      throwInfo = { scored: false, dunk: false, npc: true, t0: performance.now(), settledAt: 0 };
+      if (sound) sound("bounce", 0.4);
+    }
+  };
+
+  // court is for Phil; state is a test hook for automated checks
+  return { court, get state() { return { enabled, hoop: hoop && { ...hoop }, ball: { ...ball } }; } };
 }

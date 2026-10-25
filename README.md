@@ -123,6 +123,7 @@ Grab the ball (side court or free throw) and spin it fast — about two quick lo
 
 - he wanders along the bottom of the screen (on phones only a short stretch by the right edge), turns toward where he walks, and glances at the cursor when standing;
 - reactions: jump with arms up (happy), slump (sad), jump back (shock), hand behind the head (smug), wave; plus breathing and blinking;
+- every 50–120 s (wide screens, side court on) he walks to the side-court ball, picks it up, carries it to a spot facing the hoop and takes a jump shot. He makes it with a 5% chance. `court.npcThrow()` in `hoop.js` tries candidate trajectories in a silent copy of the physics (at three step sizes) and keeps one whose result matches the plan, because rim and backboard bounces make plain aiming unreliable. On a miss he gets angry (stomping, fists, red face) and blames everything around him; on a make he lights up, sunglasses drop onto his face and he tells everyone they are noobs. If the player is watching (tab visible and focused) when he scores, the secret achievement «Свидетель чуда» unlocks. His shots never count toward the player's baskets;
 - his signature smoke break: he stops, puts a cigarette in his mouth, raises a lighter, the flame flickers, the ember glows, smoke drifts from the tip and he exhales a cloud.
 
 `avatar.js` owns the speech bubble (it follows his head and stays inside the screen) and the lines. If WebGL or the library is not available, it falls back to a flat anime-style SVG badge in the corner with the same lines and a 2D smoke animation.

@@ -1,9 +1,9 @@
-import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251450";
-import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251450";
-import { initHoop } from "./hoop.js?v=202610251450";
-import { freeThrow } from "./freethrow.js?v=202610251450";
-import { onSkinChange } from "./ballskin.js?v=202610251450";
-import { initAvatar } from "./avatar.js?v=202610251450";
+import { QUIZ, API_URL, RMT_GOAL, SEASONS, RMT_MODEL } from "./config.js?v=202610251504";
+import { calibrate, forecast, decayStats, seasonDay, priceAt, resolveSeason, MIN_POINTS } from "./rmtmodel.js?v=202610251504";
+import { initHoop } from "./hoop.js?v=202610251504";
+import { freeThrow } from "./freethrow.js?v=202610251504";
+import { onSkinChange } from "./ballskin.js?v=202610251504";
+import { initAvatar } from "./avatar.js?v=202610251504";
 
 const phil = initAvatar(); // anime Phil in the corner, comments on what happens
 
@@ -1214,11 +1214,19 @@ function playCourtSound(kind, power) {
 
 const hoopGame = initHoop({
   onBasket: scoredBasket,
+  // Phil's own shots: only a basket the player actually watched (tab visible and focused) earns the achievement
+  onNpcBasket: () => {
+    sfx.swish();
+    phil.courtResult(true);
+    if (document.visibilityState === "visible" && document.hasFocus()) setTimeout(() => unlock("phil_bucket"), 600);
+  },
+  onNpcMiss: () => phil.courtResult(false),
   onMiss: () => phil.say("miss"),
   onDunk: () => { sfx.brick(); unlock("dunk"); phil.say("dunk", { force: true }); },
   sound: playCourtSound
 });
-if (new URLSearchParams(location.search).has("debug")) window.__hoop = hoopGame; // for automated checks only
+phil.useCourt(hoopGame.court);
+if (new URLSearchParams(location.search).has("debug")) { window.__hoop = hoopGame; window.__phil = phil; } // for automated checks only
 
 // Spinning the held ball fast turns it into Phil's face (and back)
 onSkinChange((face) => {
