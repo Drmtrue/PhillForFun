@@ -1,6 +1,6 @@
-import { QUIZ, API_URL } from "./config.js?v=202610251328";
-import { initHoop } from "./hoop.js?v=202610251328";
-import { freeThrow } from "./freethrow.js?v=202610251328";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251342";
+import { initHoop } from "./hoop.js?v=202610251342";
+import { freeThrow } from "./freethrow.js?v=202610251342";
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -990,11 +990,77 @@ async function loadPrices() {
       a.append(left, right);
       box.append(a);
     }
+    renderGoal(rows);
     $("rmt-upd").textContent = data.updatedAt ? `FunPay · ${minutesAgo(data.updatedAt)}` : "FunPay";
     $("rmt-note").textContent = "Самая низкая цена за 1 Divine Orb у продавцов онлайн в текущей лиге. Обновляется раз в 20 минут." +
       (converted ? ` FunPay показывает цены в ${converted.original.unit}, пересчитано по курсу ЦБ: 1 ${converted.original.unit} = ${fmtPrice(converted.rate)} ₽.` : "");
     $("rmt").hidden = false;
   } catch (e) { console.error(e); }
+}
+
+// Savings goal: how many Divine Orbs to sell and how long to farm them
+const fmtInt = (x) => Math.round(x).toLocaleString("ru-RU");
+
+// Russian: fractional numbers take the genitive singular ("2,5 года"), whole numbers use plural()
+const yearsLabel = (y) => {
+  const r = Math.round(y * 10) / 10;
+  const word = Number.isInteger(r) ? plural(r, "год", "года", "лет") : "года";
+  return `${r.toLocaleString("ru-RU")} ${word}`;
+};
+
+function farmTime(hours) {
+  const days = hours / RMT_GOAL.hoursPerDay;
+  const when = days >= 365 ? yearsLabel(days / 365) : `${fmtInt(days)} ${plural(Math.round(days), "день", "дня", "дней")}`;
+  return { hours, when, nonstop: yearsLabel(hours / 24 / 365) };
+}
+
+function renderGoal(rows) {
+  const box = $("rmt-goal");
+  const priced = rows.filter((r) => r.price);
+  if (!RMT_GOAL || !priced.length) { box.hidden = true; return; }
+  box.innerHTML = "";
+
+  const head = document.createElement("div");
+  head.className = "goal-head";
+  const t = document.createElement("b");
+  t.textContent = `🎯 Цель: ${RMT_GOAL.title}`;
+  const sum = document.createElement("span");
+  sum.className = "goal-sum";
+  sum.textContent = `${fmtInt(RMT_GOAL.priceRub)} ₽`;
+  head.append(t, sum);
+  box.append(head);
+
+  for (const r of priced) {
+    const rate = RMT_GOAL.divinesPerHour[r.short === "PoE 1" ? "poe1" : "poe2"];
+    const need = Math.ceil(RMT_GOAL.priceRub / r.price);
+    const ft = farmTime(need / rate);
+    const line = document.createElement("div");
+    line.className = "goal-line";
+    const g = document.createElement("b");
+    g.textContent = r.short;
+    const d = document.createElement("div");
+    const a = document.createElement("span");
+    a.className = "goal-big";
+    a.textContent = `${fmtInt(need)} Divine`;
+    const lines = [
+      `≈ ${fmtInt(ft.hours)} ч фарма: ${ft.when} по ${RMT_GOAL.hoursPerDay} ч в день`,
+      `или ${ft.nonstop} без сна и перекуров`,
+      `доход ≈ ${fmtPrice(r.price * rate)} ₽ в час`
+    ].map((txt) => {
+      const el = document.createElement("span");
+      el.className = "goal-sub";
+      el.textContent = txt;
+      return el;
+    });
+    d.append(a, ...lines);
+    line.append(g, d);
+    box.append(line);
+  }
+  const note = document.createElement("p");
+  note.className = "goal-note";
+  note.textContent = `Темп фарма: ${RMT_GOAL.divinesPerHour.poe1} Divine в час для игрока выше среднего (оценка по гайдам и сообществу: уверенный маппер 3–6/ч, дисциплинированный фармер 10–20/ч). Продажа по самой низкой цене FunPay, без учёта комиссии.`;
+  box.append(note);
+  box.hidden = false;
 }
 
 /* ---------- Side-court baskets (separate from quiz points) ---------- */

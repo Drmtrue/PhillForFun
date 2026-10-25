@@ -88,6 +88,8 @@ The "Биржа РМТ" panel shows the cheapest price for 1 Divine Orb on FunPa
 - prices in rubles: the server asks FunPay for ruble prices via its currency switch; if FunPay does not offer rubles for the server's location, it converts using the Central Bank of Russia daily rate and the page says so;
 - refreshed at most every 20 minutes, with a trend arrow when the price moves.
 
+Below the prices is a savings goal (`RMT_GOAL` in `config.js`: a new PC for 250 000 ₽). For each game it shows how many Divine Orbs must be sold at the current cheapest price, how many hours of farming that is at 8 Divine/hour (an above-average player: between "comfortable mapper" 3–6/h and "disciplined farmer" 10–20/h in community estimates), the same in years at 6 hours a day and non-stop, and the resulting income per hour. Sources for the rates are noted in `config.js`.
+
 ## Free throw (second chance)
 
 After the first wrong answer to a question, the right answer stays hidden and a free-throw court opens in a modal. The player gets one throw from behind the free-throw line:

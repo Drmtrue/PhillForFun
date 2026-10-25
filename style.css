@@ -620,3 +620,15 @@ body.hoop-on .hoop-hud { display: block; }
 .ft-result.ok { color: var(--green) !important; }
 .ft-result.bad { color: var(--wood) !important; }
 .ft-skip { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+/* RMT savings goal */
+.rmt-goal { margin-top: 10px; padding: 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(255,176,32,.08), transparent); border: 1px dashed rgba(255, 176, 32, .4); }
+.goal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.goal-head b { font-size: 15px; }
+.goal-sum { font-family: "Graduate", serif; color: var(--led); font-size: 18px; white-space: nowrap; }
+.goal-line { display: grid; grid-template-columns: 52px 1fr; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.goal-line > b { font-size: 14px; padding-top: 2px; }
+.goal-line > div { display: flex; flex-direction: column; line-height: 1.35; }
+.goal-big { font-family: "Graduate", serif; font-size: 17px; color: var(--text); }
+.goal-sub { font-size: 12.5px; color: var(--muted); }
+.goal-note { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.4; }
