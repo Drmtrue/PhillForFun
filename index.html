@@ -40,20 +40,20 @@
       <div class="hero">
         <div class="hero-text">
           <p class="kicker"><span class="dot"></span> квиз • 10 вопросов • ник x23x</p>
-          <h1>Трансформация<br><span>Безработного</span></h1>
-          <p class="lead">Кто лучше всех знает Фила? Ответь на 10 вопросов и узнай, где ты в этой схеме.</p>
+          <h1>Трансформация<br><span id="title-word">Безработного</span></h1>
+          <p class="lead">Кто лучше всех знает Фила? Ответь на 10 вопросов и узнай, <button type="button" class="link-egg" id="scheme-link">где ты в этой схеме</button>.</p>
         </div>
 
         <!-- Jersey #23 -->
-        <div class="jersey-wrap" aria-hidden="true">
-          <div class="smoke"><span></span><span></span><span></span></div>
-          <svg class="jersey" viewBox="0 0 200 230">
+        <div class="jersey-wrap">
+          <div class="smoke" id="smoke" aria-hidden="true"><span></span><span></span><span></span></div>
+          <svg class="jersey" id="jersey" viewBox="0 0 200 230" aria-hidden="true">
             <path class="jersey-body" d="M62 8 C70 28 130 28 138 8 L168 18 C164 40 170 62 186 74 L178 222 L22 222 L14 74 C30 62 36 40 32 18 Z"/>
             <path class="jersey-trim" d="M62 8 C70 28 130 28 138 8" />
             <path class="jersey-trim" d="M32 18 C36 40 30 62 14 74" />
             <path class="jersey-trim" d="M168 18 C164 40 170 62 186 74" />
             <text x="100" y="78" class="jersey-name" text-anchor="middle">ФИЛ</text>
-            <text x="100" y="178" class="jersey-num" text-anchor="middle">23</text>
+            <text x="100" y="178" class="jersey-num" id="jersey-num" text-anchor="middle">23</text>
           </svg>
         </div>
       </div>
@@ -67,9 +67,20 @@
       <div class="panel">
         <div class="panel-head">
           <h2>Таблица лидеров</h2>
-          <span class="tag">сезон 23</span>
+          <span class="tag">по среднему баллу</span>
         </div>
         <ol class="board" id="board-start"><li class="muted">Загрузка…</li></ol>
+      </div>
+
+      <div class="panel ach-block">
+        <div class="panel-head">
+          <h2>Ачивки</h2>
+          <span class="tag" id="ach-count">0/0</span>
+        </div>
+        <details class="ach-details">
+          <summary>Показать все ачивки и пасхалки</summary>
+          <div class="ach-grid" id="ach-grid"></div>
+        </details>
       </div>
 
       <div class="panel fact-block" id="fact-block" hidden>
@@ -99,7 +110,7 @@
         </div>
         <div class="sb-cell sb-mid">
           <span class="sb-label">x23x</span>
-          <span class="sb-ball" aria-hidden="true"></span>
+          <span class="sb-ball" id="sb-ball" aria-hidden="true"></span>
         </div>
         <div class="sb-cell">
           <span class="sb-label">Очки</span>
@@ -132,14 +143,19 @@
       <h2 class="verdict" id="verdict"></h2>
       <p class="lead" id="verdict-sub"></p>
       <p class="muted small" id="save-status"></p>
+      <div class="new-ach" id="new-ach" hidden>
+        <span class="sb-label">Новые ачивки за матч</span>
+        <div class="chips" id="new-ach-list"></div>
+      </div>
       <div class="row">
         <button class="btn primary" id="again-btn">Ещё матч</button>
         <button class="btn" id="share-btn">Позвать друга</button>
+        <button class="btn" id="home-btn">На главную</button>
       </div>
       <div class="panel">
         <div class="panel-head">
           <h2>Таблица лидеров</h2>
-          <span class="tag">сезон 23</span>
+          <span class="tag">по среднему баллу</span>
         </div>
         <ol class="board" id="board-result"></ol>
       </div>
@@ -147,8 +163,10 @@
 
   </main>
   <footer class="foot" id="foot"></footer>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script src="questions.js"></script>
+  <script src="achievements.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

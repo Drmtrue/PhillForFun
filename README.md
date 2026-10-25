@@ -2,7 +2,7 @@
 
 **Live site:** https://rootb1t.github.io/PhillForFun/
 
-A Russian-language party quiz about our friend Phil (aka **x23x**). Each game picks 10 random questions from a shared pool, each with 4 answers, and results go to a shared leaderboard. Any player can submit a fact about Phil, and **Root AI - model b1t quiz v1.1** turns it into new funny questions that join the pool right away.
+A Russian-language party quiz about our friend Phil (aka **x23x**). Each game picks 10 random questions from a shared pool, each with 4 answers. The shared leaderboard tracks every player's attempts, total points and average score, and is ranked by the average. Players also collect themed achievements and can hunt for hidden easter eggs. Any player can submit a fact about Phil, and **Root AI - model b1t quiz v1.1** turns it into new funny questions that join the pool right away.
 
 > The code, comments and docs are in English. Everything players see (questions, buttons, verdicts) is in Russian on purpose.
 
@@ -12,6 +12,7 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 | --- | --- | --- |
 | Site | `index.html`, `style.css`, `app.js`, `config.js` | Static front end, hosted on GitHub Pages |
 | Built-in questions | `questions.js` | The starting question pool |
+| Achievements | `achievements.js` | Achievement catalogue (unlock logic and easter eggs live in `app.js`) |
 | Server | `worker/` | Cloudflare Worker: takes facts, generates and moderates questions with Root AI - model b1t quiz v1.1, stores questions and scores |
 | Admin | `admin.html` | Review and delete player-generated questions, browse submitted facts |
 
@@ -41,7 +42,10 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/questions` | Player-generated questions |
-| `GET` | `/scores` | Leaderboard (best result per player) |
+| `GET` | `/scores` | Leaderboard: attempts, total points, average and achievement count per player, sorted by average |
+| `GET` | `/player?name=` | One player's attempts, points and average |
+| `GET` | `/achievements?name=` | Achievement ids unlocked by a player |
+| `POST` | `/achievements` | Unlock achievements `{ name, ids: [...] }` |
 | `POST` | `/scores` | Save a result `{ name, score, total }` |
 | `POST` | `/facts` | Submit a fact `{ fact, author }` → generated questions or a rejection reason |
 | `GET` | `/admin/questions`, `/admin/facts` | Admin lists (`Authorization: Bearer <ADMIN_TOKEN>`) |
@@ -60,3 +64,7 @@ Add an entry to `questions.js` (question text in Russian):
 ```
 
 Answers are shuffled automatically, so always put the right one in `correct`.
+
+## Achievements
+
+Defined in `achievements.js` (`id`, `icon`, `title`, `desc`, optional `secret` + `hint` for easter eggs). To add one, append an entry and call `unlock("<id>")` from `app.js` where it should trigger. Unlocks are cached in the browser and synced to the server per player name, so they follow the player across devices.

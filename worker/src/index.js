@@ -33,7 +33,7 @@ export default {
 
       // Leaderboard
       if (path === "/scores" && request.method === "GET") {
-        return json({ scores: await store.topScores(15) });
+        return json({ scores: await store.topScores(20) });
       }
       if (path === "/scores" && request.method === "POST") {
         const body = await request.json().catch(() => ({}));
@@ -49,6 +49,33 @@ export default {
         }
         await store.addScore(name, score, total);
         return json({ ok: true });
+      }
+
+      // One player's totals
+      if (path === "/player" && request.method === "GET") {
+        const name = clean(url.searchParams.get("name"), 30);
+        if (!name) return json({ error: "Нужно имя" }, 400);
+        return json(await store.playerStats(name));
+      }
+
+      // Achievements (per player name)
+      if (path === "/achievements" && request.method === "GET") {
+        const name = clean(url.searchParams.get("name"), 30);
+        if (!name) return json({ error: "Нужно имя" }, 400);
+        return json({ ids: await store.listAchievements(name) });
+      }
+      if (path === "/achievements" && request.method === "POST") {
+        const body = await request.json().catch(() => ({}));
+        const name = clean(body.name, 30);
+        const ids = (Array.isArray(body.ids) ? body.ids : [body.id])
+          .map((x) => String(x ?? ""))
+          .filter((x) => /^[a-z0-9_]{2,40}$/.test(x))
+          .slice(0, 60);
+        if (!name || !ids.length) return json({ error: "Некорректная ачивка" }, 400);
+        if (!(await store.allow(ip, "ach", 300, 3600))) {
+          return json({ error: "Слишком много ачивок за час. Даже Фил так не фармит." }, 429);
+        }
+        return json({ ids: await store.addAchievements(name, ids) });
       }
 
       // New fact -> questions
@@ -142,7 +169,13 @@ export class QuizStore extends DurableObject {
           kind TEXT NOT NULL,
           ts INTEGER NOT NULL
         )`,
-      `CREATE INDEX IF NOT EXISTS hits_idx ON hits (key, kind, ts)`
+      `CREATE INDEX IF NOT EXISTS hits_idx ON hits (key, kind, ts)`,
+      `CREATE TABLE IF NOT EXISTS achievements (
+          name_key TEXT NOT NULL,
+          ach_id TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (name_key, ach_id)
+        )`
     ];
     for (const q of schema) this.sql.exec(q);
   }
@@ -213,19 +246,54 @@ export class QuizStore extends DurableObject {
     this.sql.exec("INSERT INTO scores (name, score, total, created_at) VALUES (?, ?, ?, ?)", name, score, total, Date.now());
   }
 
-  // Best result per player (by percentage); ties go to whoever scored first
-  topScores(limit) {
+  // Per-player totals from all attempts. Grouping is done in JS because SQLite's lower()
+  // only folds ASCII, and most names here are Cyrillic.
+  playerTotals() {
     const rows = this.sql.exec("SELECT name, score, total, created_at FROM scores ORDER BY id").toArray();
-    const best = new Map();
+    const map = new Map();
     for (const r of rows) {
-      const key = r.name.toLowerCase();
-      const cur = best.get(key);
-      const ratio = r.score / r.total;
-      if (!cur || ratio > cur.score / cur.total) best.set(key, r);
+      const k = r.name.trim().toLowerCase();
+      const p = map.get(k) || { name: r.name, attempts: 0, points: 0, possible: 0, firstAt: r.created_at };
+      p.name = r.name; // latest spelling wins
+      p.attempts += 1;
+      p.points += r.score;
+      p.possible += r.total;
+      map.set(k, p);
     }
-    return [...best.values()]
-      .sort((a, b) => b.score / b.total - a.score / a.total || a.created_at - b.created_at)
-      .slice(0, limit)
-      .map((r) => ({ name: r.name, score: r.score, total: r.total, createdAt: r.created_at }));
+    return map;
+  }
+
+  // Sorted by average points per attempt; ties go to more attempts, then to whoever started first.
+  topScores(limit) {
+    const ach = new Map(
+      this.sql.exec("SELECT name_key AS k, COUNT(*) AS n FROM achievements GROUP BY name_key").toArray().map((r) => [r.k, r.n])
+    );
+    return [...this.playerTotals().entries()]
+      .map(([k, p]) => ({ ...p, avg: Math.round((p.points / p.attempts) * 10) / 10, achievements: ach.get(k) || 0 }))
+      .sort((a, b) => b.points / b.attempts - a.points / a.attempts || b.attempts - a.attempts || a.firstAt - b.firstAt)
+      .slice(0, limit);
+  }
+
+  playerStats(name) {
+    const p = this.playerTotals().get(name.trim().toLowerCase());
+    if (!p) return { attempts: 0, points: 0, avg: 0 };
+    return { attempts: p.attempts, points: p.points, avg: Math.round((p.points / p.attempts) * 10) / 10 };
+  }
+
+  listAchievements(name) {
+    return this.sql.exec("SELECT ach_id FROM achievements WHERE name_key = ? ORDER BY created_at", name.trim().toLowerCase())
+      .toArray().map((r) => r.ach_id);
+  }
+
+  addAchievements(name, ids) {
+    const key = name.trim().toLowerCase();
+    const have = this.sql.exec("SELECT COUNT(*) AS n FROM achievements WHERE name_key = ?", key).one().n;
+    let room = Math.max(0, 100 - have);
+    for (const id of ids) {
+      if (room <= 0) break;
+      this.sql.exec("INSERT OR IGNORE INTO achievements (name_key, ach_id, created_at) VALUES (?, ?, ?)", key, id, Date.now());
+      room--;
+    }
+    return this.listAchievements(name);
   }
 }
