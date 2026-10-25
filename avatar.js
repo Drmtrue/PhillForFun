@@ -140,6 +140,7 @@ const LINES = {
       "Мяч скучает. Сейчас исправим."
     ]
   },
+  noHoop: { mood: "sad", pri: 3, lines: ["Кольца нет — бросать некуда. Разверни окно пошире.", "Тут даже кольца нет. Как и работы."] },
   // The 5% roll came up: he calls the shot before taking it
   callShot: { mood: "smug", pri: 3, lines: ["Скриньте - один раз показываю"] },
   // Phil missed his own shot: everything and everyone is to blame
@@ -288,9 +289,13 @@ export function initAvatar() {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251509")
+  import("./phil3d.js?v=202610251512")
     .then(({ createPhil3D }) => {
-      body3d = createPhil3D(root, { bubble, onClick: () => say("click", { force: true }) });
+      body3d = createPhil3D(root, {
+        bubble,
+        onClick: () => say("click", { force: true }),
+        onContext: shootNow          // right click: go shoot right now, no waiting for the timer
+      });
       root.classList.add("phil-3d");
     })
     .catch((e) => {
@@ -334,12 +339,25 @@ export function initAvatar() {
   // ----- Phil shoots at the side-court hoop now and then (5% to make it)
   const MAKE_CHANCE = 0.05;
   let court = null;
-  function tryShot(make = Math.random() < MAKE_CHANCE) {
-    if (!body3d || !court || !court.enabled || document.hidden || body3d.busy || document.querySelector(".ft-overlay")) return false;
-    if (!body3d.shoot(court, make)) return false;
+  function tryShot(make = Math.random() < MAKE_CHANCE, force = false) {
+    if (!body3d || !court || !court.enabled || document.hidden || document.querySelector(".ft-overlay")) return false;
+    if (!force && body3d.busy) return false;
+    if (!body3d.shoot(court, make, force)) return false;
     if (make) say("callShot", { force: true });
     else say("shootStart");
     return true;
+  }
+  // Right click on Phil. If the player is holding the ball (or it is still flying), he waits a few seconds for it.
+  let pending = null;
+  function shootNow() {
+    if (!court || !court.enabled) { say("noHoop", { force: true }); return; }
+    clearInterval(pending);
+    const make = Math.random() < MAKE_CHANCE;
+    if (tryShot(make, true)) return;
+    let tries = 0;
+    pending = setInterval(() => {
+      if (tryShot(make, true) || ++tries > 20) clearInterval(pending);
+    }, 300);
   }
   (function scheduleShot() {
     setTimeout(() => { tryShot(); scheduleShot(); }, 50000 + Math.random() * 70000);

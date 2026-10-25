@@ -1,6 +1,6 @@
 // 3D cartoon Phil who walks along the bottom of the screen and acts out reactions.
 // Built from simple shapes with Three.js; all animation is procedural (no rig or model files).
-// createPhil3D(root, { bubble, onClick }) → { react(kind), smoke(), get smoking }
+// createPhil3D(root, { bubble, onClick, onContext }) → { react(kind), smoke(), shoot(court, make, force), glasses(on), busy, smoking }
 // Reactions: "happy", "sad", "shock", "smug", "wave", "neutral".
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
@@ -12,7 +12,7 @@ const COLORS = {
 const SPEED = 62;          // walking speed, px/s
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
-export function createPhil3D(root, { bubble, onClick } = {}) {
+export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   const small = () => window.innerWidth < 700;
   let W = 0, H = 0;
 
@@ -24,6 +24,7 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
   hit.title = "Фил";
   root.append(canvas, hit);
   hit.addEventListener("click", () => onClick && onClick());
+  hit.addEventListener("contextmenu", (e) => { e.preventDefault(); onContext && onContext(); });
 
   const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setPixelRatio(DPR);
@@ -242,8 +243,16 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
 
   // Walk to the side-court ball, carry it to a spot facing the hoop, and take a jump shot.
   // The court decides where it lands; make = true aims for the rim center.
-  function shoot(court, make) {
-    if (st.task || st.react || st.smokeT >= 0 || !court.ballAvailable()) return false;
+  // force = true drops whatever he is doing (a reaction, a smoke break, the shades) and goes right away
+  function shoot(court, make, force = false) {
+    if (st.task || !court.ballAvailable()) return false;
+    if (force) {
+      st.react = null;
+      st.smokeT = -1;
+      cig.visible = lighter.visible = flame.visible = false;
+      st.shadesOn = false;
+    }
+    if (st.react || st.smokeT >= 0) return false;
     st.task = { court, make, phase: "toBall", t: 0, targetX: court.ballPos().x - W / 2 };
     return true;
   }
@@ -545,7 +554,7 @@ export function createPhil3D(root, { bubble, onClick } = {}) {
   requestAnimationFrame(frame);
   return {
     react, smoke, shoot,
-    glasses(on) { st.shadesOn = on; },
+    glasses(on) { if (!(on && st.task)) st.shadesOn = on; },
     get busy() { return !!st.task || st.smokeT >= 0 || !!st.react; },
     get smoking() { return st.smokeT >= 0; }, get puffs() { return puffs.filter((p) => p.visible).length; }
   };
