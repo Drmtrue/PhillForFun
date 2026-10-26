@@ -16,13 +16,17 @@ const LINES = {
   milestone: { id: "bath_ms", mood: "smug", pri: 2, lines: ["Минута в ванне. Я в своей стихии.", "Вот это ванна. Вот это жизнь."] }
 };
 
+// ctx.skin (builder portals): { place, phone } renames the scene
 export function mountBath(el, ctx) {
+  const sk = ctx.skin || null;
+  const phoneName = sk?.phone || "телефон";
+  const startText = sk ? `Начать: ${sk.place}` : "Набрать ванну";
   el.innerHTML = `
     <div class="bath-scene">
       <svg viewBox="0 0 320 210" class="bath-svg" aria-hidden="true">
         <defs><clipPath id="bath-head-clip"><circle cx="0" cy="0" r="34"/></clipPath></defs>
         <g class="bath-steam"><path d="M90 60 q-10 -15 0 -30 q10 -15 0 -30"/><path d="M160 50 q-10 -15 0 -30 q10 -15 0 -30"/><path d="M230 60 q-10 -15 0 -30 q10 -15 0 -30"/></g>
-        <g class="bath-head"><image href="assets/phil-face.png" x="-34" y="-34" width="68" height="68" clip-path="url(#bath-head-clip)"/><circle r="34" fill="none" stroke="#e8a33d" stroke-width="2"/><g class="bath-lids"><rect x="-34" y="-7" width="68" height="0" rx="6" fill="#e9b796" opacity=".92"/></g></g>
+        <g class="bath-head"><image href="${ctx.face || "assets/phil-face.png"}" x="-34" y="-34" width="68" height="68" clip-path="url(#bath-head-clip)"/><circle r="34" fill="none" stroke="#e8a33d" stroke-width="2"/><g class="bath-lids"><rect x="-34" y="-7" width="68" height="0" rx="6" fill="#e9b796" opacity=".92"/></g></g>
         <text class="bath-z" x="200" y="70">Z</text><text class="bath-z z2" x="216" y="54">z</text>
         <rect class="bath-water" x="30" y="110" width="260" height="16" rx="8"/>
         <g class="bath-bubbles"><circle cx="62" cy="112" r="9"/><circle cx="84" cy="108" r="12"/><circle cx="108" cy="113" r="7"/><circle cx="226" cy="110" r="10"/><circle cx="248" cy="113" r="8"/><circle cx="208" cy="114" r="6"/></g>
@@ -40,7 +44,7 @@ export function mountBath(el, ctx) {
     </div>
     <div class="game-stats"><div><span class="sb-label">Время</span><b class="bt-time">0,0 с</b></div><div><span class="sb-label">Рекорд</span><b class="bt-best">0 с</b></div></div>
     <div class="farm-actions">
-      <button type="button" class="btn primary bt-start">Набрать ванну</button>
+      <button type="button" class="btn primary bt-start">${startText}</button>
       <button type="button" class="btn bt-hot" disabled>🔥 Горячий кран (держи)</button>
       <button type="button" class="btn bt-splash" disabled>💦 Плеснуть в лицо</button>
     </div>`;
@@ -124,7 +128,9 @@ export function mountBath(el, ctx) {
     q(".bt-hot").disabled = q(".bt-splash").disabled = true;
     ctx.sfx.brick();
     ctx.say(LINES[why], { force: true });
-    const reason = { hot: "Сварился", cold: "Замёрз", sleep: "Уснул", phone: "Утопил телефон" }[why];
+    const reason = sk
+      ? { hot: "Перегрелся", cold: "Замёрз", sleep: "Уснул", phone: `Уронил: ${phoneName}` }[why]
+      : { hot: "Сварился", cold: "Замёрз", sleep: "Уснул", phone: "Утопил телефон" }[why];
     const sec = Math.floor(s.t);
     const rec = sec > best();
     if (rec) ctx.store.set(KEY, sec);

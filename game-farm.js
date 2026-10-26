@@ -27,13 +27,36 @@ const LINES = {
   end: { id: "farm_end", mood: "smug", pri: 3, lines: ["Лига закрыта. До компьютера осталось совсем чуть-чуть. Лет двадцать.", "Хорошая лига. Почти окупил сигареты."] }
 };
 
+// ctx.skin (builder portals): { currency, market, action } renames the round; events become generic
+const cap = (s) => String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1);
+
 export function mountFarm(el, ctx) {
+  const sk = ctx.skin || null;
+  const T = sk ? {
+    cur: cap(sk.currency), action: sk.action, market: sk.market,
+    events: [
+      { text: "Рынок обвалился — цена −25%", apply: (s) => { s.priceMult *= 0.75; } },
+      { text: "Конкуренты демпингуют — цена −15%", apply: (s) => { s.priceMult *= 0.85; } },
+      { text: "Ажиотаж — цена ×1.3 на 3 дня", apply: (s) => { s.hype = 1.3; s.hypeUntil = s.day + 3; } },
+      { text: "Добыча идёт хуже 4 дня", apply: (s) => { s.dropMult = 0.5; s.dropUntil = s.day + 4; } },
+      { text: `${ctx.hero || "Герой"} ушёл отдыхать — 2 дня простоя`, apply: (s) => { s.afkUntil = s.day + 2; } }
+    ],
+    afk: "😴 отдых", scam: (m) => `🚨 Обман на рынке «${sk.market}»: пришла только половина (${m}).`,
+    burnt: (n) => `🔥 ${n} непроданных пропали в конце раунда. `, start: () => "",
+    best: (b) => `Рекорд за раунд: ${b}`, idle: "Раунд длится 90 секунд: 30 игровых дней по 3 секунды."
+  } : {
+    cur: "Диваны", action: "🗺️ Бежать карту", market: "FunPay", events: EVENTS, afk: "🛁 в ванне",
+    scam: (m) => `🚨 Скам: покупатель открыл арбитраж, пришла только половина (${m}).`,
+    burnt: (n) => `🔥 ${n} непроданных диванов ушли в Стандарт. `,
+    start: (real, f) => (real ? `Стартовая цена — от сегодняшней на FunPay (${f(real)} за Divine), в начале лиги втрое дороже.` : ""),
+    best: (b) => `Рекорд за лигу: ${b}`, idle: "Лига длится 90 секунд: 30 игровых дней по 3 секунды."
+  };
   el.innerHTML = `
     <div class="farm-top">
       <div class="game-stats">
         <div><span class="sb-label">День</span><b class="fm-day">—</b></div>
         <div><span class="sb-label">Цена</span><b class="fm-price">—</b></div>
-        <div><span class="sb-label">Диваны</span><b class="fm-divs">0</b></div>
+        <div><span class="sb-label">${T.cur}</span><b class="fm-divs">0</b></div>
         <div><span class="sb-label">Рубли</span><b class="fm-rub">0</b></div>
       </div>
       <div class="progress"><div class="progress-bar fm-bar"></div></div>
@@ -42,7 +65,7 @@ export function mountFarm(el, ctx) {
     </div>
     <div class="farm-actions">
       <button type="button" class="btn primary fm-start">Старт лиги</button>
-      <button type="button" class="btn fm-run" disabled>🗺️ Бежать карту</button>
+      <button type="button" class="btn fm-run" disabled>${T.action}</button>
       <button type="button" class="btn fm-sell" disabled>💰 Продать всё</button>
     </div>
     <p class="muted small fm-best"></p>`;
@@ -57,7 +80,7 @@ export function mountFarm(el, ctx) {
   const fmtRub = (x) => `${x.toLocaleString("ru-RU", { maximumFractionDigits: x < 10 ? 2 : 0 })} ₽`;
 
   function start() {
-    const real = ctx.divinePrice();
+    const real = sk ? null : ctx.divinePrice();
     s = {
       day: 0, divs: 0, rub: 0, base: real || 1.2, priceMult: 1, noise: 1, hype: 1, hypeUntil: -1,
       dropMult: 1, dropUntil: -1, afkUntil: -1, history: [], sold: 0, running: true, lastEvent: -5, scammed: false
@@ -66,7 +89,7 @@ export function mountFarm(el, ctx) {
     q(".fm-start").hidden = true;
     q(".fm-run").disabled = false;
     q(".fm-sell").disabled = false;
-    q(".fm-event").textContent = real ? `Стартовая цена — от сегодняшней на FunPay (${fmtRub(real)} за Divine), в начале лиги втрое дороже.` : "";
+    q(".fm-event").textContent = T.start(real, fmtRub);
     ctx.say(LINES.start, { force: true });
     ctx.scene?.("dota");
     clearInterval(timer);
@@ -90,7 +113,7 @@ export function mountFarm(el, ctx) {
     s.noise = 0.93 + Math.random() * 0.14;
     if (s.day >= s.dropUntil) s.dropMult = 1;
     if (s.day > 2 && s.day - s.lastEvent > 3 && Math.random() < 0.18) {
-      const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+      const ev = T.events[Math.floor(Math.random() * T.events.length)];
       ev.apply(s);
       s.lastEvent = s.day;
       q(".fm-event").textContent = `📢 День ${s.day + 1}: ${ev.text}`;
@@ -102,7 +125,7 @@ export function mountFarm(el, ctx) {
 
   function run(e) {
     if (!s || !s.running) return;
-    if (s.day < s.afkUntil) { flash(e, "🛁 в ванне"); return; }
+    if (s.day < s.afkUntil) { flash(e, T.afk); return; }
     const r = Math.random();
     if (r < STACK * s.dropMult) { s.divs += 5; flash(e, "+5 💎"); ctx.sfx.egg(); ctx.say(LINES.stack); ctx.scene?.("divine"); }
     else if (r < (STACK + DROP) * s.dropMult) { s.divs += 1; flash(e, "+1 💎"); ctx.sfx.pop(0.4); }
@@ -117,7 +140,7 @@ export function mountFarm(el, ctx) {
     s.divs = 0;
     if (Math.random() < SCAM) {
       money /= 2;
-      q(".fm-event").textContent = `🚨 Скам: покупатель открыл арбитраж, пришла только половина (${fmtRub(money)}).`;
+      q(".fm-event").textContent = T.scam(fmtRub(money));
       ctx.say(LINES.scam, { force: true });
       ctx.scene?.("rage");
       ctx.unlock("farm_scam");
@@ -136,7 +159,7 @@ export function mountFarm(el, ctx) {
     const burnt = s.divs;
     if (burnt >= 20) ctx.unlock("farm_hodl");
     const left = Math.max(0, ctx.goalRub - s.rub);
-    q(".fm-event").textContent = (burnt ? `🔥 ${burnt} непроданных диванов ушли в Стандарт. ` : "") +
+    q(".fm-event").textContent = (burnt ? T.burnt(burnt) : "") +
       `Итог лиги: ${fmtRub(s.rub)}. До компьютера осталось ${fmtRub(left)}.`;
     ctx.say(burnt ? LINES.burn : LINES.end, { force: true });
     if (s.rub > best()) ctx.store.set(KEY, s.rub);
@@ -165,7 +188,7 @@ export function mountFarm(el, ctx) {
   }
 
   function render() {
-    q(".fm-best").textContent = best() ? `Рекорд за лигу: ${fmtRub(best())}` : "Лига длится 90 секунд: 30 игровых дней по 3 секунды.";
+    q(".fm-best").textContent = best() ? T.best(fmtRub(best())) : T.idle;
     if (!s) return;
     q(".fm-day").textContent = `${Math.min(DAYS, s.day + 1)}/${DAYS}`;
     const p = price();

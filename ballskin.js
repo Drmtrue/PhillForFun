@@ -6,6 +6,8 @@ const face = new Image();
 let faceReady = false;
 face.onload = () => { faceReady = true; };
 face.src = "assets/phil-face.png";
+// Builder portals use the face cropped from the hero's photo
+export function setFaceSrc(src) { if (src) { faceReady = false; face.src = src; } }
 
 let faceMode = false;
 const listeners = new Set();

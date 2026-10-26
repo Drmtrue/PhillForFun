@@ -12,7 +12,10 @@ const COLORS = {
 const SPEED = 62;          // walking speed, px/s
 const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
-export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
+// look (builder portals): { hair: { style, color }, skin, eyes, beard, mustache, glasses, build, top: { type, color }, pants, shoes, number }
+// Without a look the avatar is Phil: buzz cut, stubble, black #23 jersey, jeans, red sneakers.
+export function createPhil3D(root, { bubble, onClick, onContext, look = null } = {}) {
+  const L = lookOf(look);
   const small = () => window.innerWidth < 700;
   let W = 0, H = 0;
 
@@ -48,19 +51,19 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0, ...o });
   const basic = (color, o = {}) => new THREE.MeshBasicMaterial({ color, ...o });
   const M = {
-    skin: std(COLORS.skin, { roughness: 0.5 }),
-    nose: std(COLORS.skinDark, { roughness: 0.45 }),
-    hair: std(COLORS.hair, { roughness: 1, map: speckle() }),
-    brow: std(COLORS.brow, { roughness: 0.9 }),
-    shirt: std(COLORS.shirt, { roughness: 0.75 }),
-    jeans: std(COLORS.jeans, { roughness: 0.8 }),
-    shoe: std(COLORS.shoe, { roughness: 0.4 }),
+    skin: std(L.skin, { roughness: 0.5 }),
+    nose: std(shade(L.skin, -0.06), { roughness: 0.45 }),
+    hair: std(L.hair, { roughness: 1, map: L.hairStyle === "buzz" ? speckle() : null }),
+    brow: std(shade(L.hair, -0.18), { roughness: 0.9 }),
+    shirt: std(L.top, { roughness: 0.75 }),
+    jeans: std(L.pants, { roughness: 0.8 }),
+    shoe: std(L.shoes, { roughness: 0.4 }),
     sole: std(COLORS.sole, { roughness: 0.6 }),
     white: std(0xffffff, { roughness: 0.25 }),
-    iris: std(COLORS.iris, { roughness: 0.2 }),
+    iris: std(L.eyes, { roughness: 0.2 }),
     pupil: std(0x111418, { roughness: 0.2 }),
     mouth: basic(COLORS.mouth, { side: THREE.DoubleSide }),
-    stubble: std(0x7a5a42, { roughness: 1, transparent: true, opacity: 0.3, depthWrite: false }),
+    stubble: std(look ? shade(L.hair, -0.25) : 0x7a5a42, { roughness: 1, transparent: true, opacity: L.beard === "short" ? 0.55 : 0.3, depthWrite: false }),
     blush: basic(0xff8c8c, { transparent: true, opacity: 0.4, depthWrite: false })
   };
   function add(geo, mat, parent, pos = [0, 0, 0], scale = null, rot = null) {
@@ -77,15 +80,48 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   // ----- Body
   const phil = group(scene, [0, -0.06, 0]);
   const hips = group(phil, [0, 0.78, 0]);
-  const torso = add(sphere(0.56), M.shirt, hips, [0, 0.36, 0], [1, 1.08, 0.86]);
-  add(sphere(0.45), M.jeans, hips, [0, -0.1, 0], [1.08, 0.62, 0.86]);
-  add(new THREE.PlaneGeometry(0.44, 0.3), basic(0xffffff, { map: numberTexture(), transparent: true }), hips, [0, 0.4, 0.488], null, [-0.08, 0, 0]);
+  const torso = add(sphere(0.56), M.shirt, hips, [0, 0.36, 0], [L.width, 1.08, 0.86 * (L.width > 1 ? 1.08 : 1)]);
+  add(sphere(0.45), M.jeans, hips, [0, -0.1, 0], [1.08 * L.width, 0.62, 0.86]);
+  if (L.number) add(new THREE.PlaneGeometry(0.44, 0.3), basic(0xffffff, { map: numberTexture(L.number, L.numberColor), transparent: true }), hips, [0, 0.4, 0.488], null, [-0.08, 0, 0]);
+  if (L.topType === "hoodie") {
+    add(new THREE.TorusGeometry(0.34, 0.11, 10, 24, Math.PI * 1.3), M.shirt, hips, [0, 0.9, -0.14], [1, 1, 0.8], [0.4, 0, Math.PI * 0.85]);
+    for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6), std(0xeeeeee), hips, [s * 0.1, 0.62, 0.47]);
+  }
+  if (L.topType === "shirt") add(new THREE.ConeGeometry(0.17, 0.18, 3), std(0xf2f2f2), hips, [0, 0.82, 0.38], [1.4, 1, 0.4], [Math.PI, 0, 0]);
 
   // Head
   const head = group(hips, [0, 1.2, 0]);
   add(sphere(0.62, 48, 32), M.skin, head, [0, 0, 0], [1, 1.02, 0.96]);
-  add(new THREE.SphereGeometry(0.64, 48, 24, 0, Math.PI * 2, 0, 1.18), M.hair, head, [0, 0.01, -0.01], [1, 1.02, 0.97], [-0.32, 0, 0]);
-  add(new THREE.SphereGeometry(0.627, 40, 16, 0.35, Math.PI - 0.7, 1.72, 1.05), M.stubble, head, [0, 0, 0], [1, 1.02, 0.965]);
+  buildHair(L.hairStyle);
+  if (L.beard === "stubble" || L.beard === "short") add(new THREE.SphereGeometry(0.627, 40, 16, 0.35, Math.PI - 0.7, 1.72, 1.05), M.stubble, head, [0, 0, 0], [1, 1.02, 0.965]);
+  if (L.beard === "full") {
+    add(new THREE.SphereGeometry(0.645, 40, 16, 0.3, Math.PI - 0.6, 1.85, 1.0), M.hair, head, [0, 0, 0.01], [1, 1.02, 0.98]);
+    add(sphere(0.2, 16, 12), M.hair, head, [0, -0.52, 0.42], [1.2, 1, 0.8]);
+  }
+  if (L.mustache) add(new THREE.CapsuleGeometry(0.035, 0.2, 4, 8), M.hair, head, [0, -0.22, 0.585], null, [0, 0, Math.PI / 2]);
+
+  // Hair styles are built from a few spheres and capsules around the head
+  function buildHair(style) {
+    if (style === "bald") return;
+    if (style === "buzz") {
+      add(new THREE.SphereGeometry(0.64, 48, 24, 0, Math.PI * 2, 0, 1.18), M.hair, head, [0, 0.01, -0.01], [1, 1.02, 0.97], [-0.32, 0, 0]);
+      return;
+    }
+    // A thicker cap for every other style
+    add(new THREE.SphereGeometry(0.67, 48, 24, 0, Math.PI * 2, 0, style === "curly" ? 1.25 : 1.3), M.hair, head, [0, 0.03, -0.02], [1.02, 1.04, 1], [-0.38, 0, 0]);
+    if (style === "short") add(new THREE.CapsuleGeometry(0.1, 0.35, 4, 8), M.hair, head, [0.18, 0.52, 0.42], null, [0.3, 0, 1.25]); // a fringe
+    if (style === "medium" || style === "long" || style === "ponytail") {
+      for (const s of [-1, 1]) add(new THREE.CapsuleGeometry(0.13, style === "long" ? 0.75 : 0.3, 6, 10), M.hair, head, [s * 0.56, style === "long" ? -0.3 : 0.02, -0.12], null, [0, 0, s * 0.12]);
+      add(sphere(0.6, 32, 20), M.hair, head, [0, style === "long" ? -0.2 : 0.05, -0.2], [1.05, style === "long" ? 1.25 : 0.95, 0.85]);
+    }
+    if (style === "ponytail") add(new THREE.CapsuleGeometry(0.11, 0.55, 6, 10), M.hair, head, [0, -0.15, -0.68], null, [0.5, 0, 0]);
+    if (style === "curly") {
+      for (let i = 0; i < 26; i++) {
+        const a = (i / 26) * Math.PI * 2 * 3, r = 0.25 + (i % 5) * 0.08;
+        add(sphere(0.17, 14, 10), M.hair, head, [Math.cos(a) * r * 1.4, 0.45 + (i % 3) * 0.08 - r * 0.25, Math.sin(a) * r - 0.1]);
+      }
+    }
+  }
   for (const s of [-1, 1]) {
     add(sphere(0.15, 16, 12), M.skin, head, [s * 0.61, 0, 0], [0.55, 1, 0.8]);
     add(sphere(0.09, 16, 12), M.blush, head, [s * 0.36, -0.13, 0.475], [1, 0.55, 0.3]);
@@ -192,6 +228,16 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   }
   add(new THREE.BoxGeometry(0.16, 0.035, 0.035), lensMat, shades, [0, 0.05, 0.06]);
   shades.visible = false;
+  // Everyday glasses: thin round frames with clear lenses
+  if (L.glasses === "regular") {
+    const frame = std(0x1b1b1f, { roughness: 0.3, metalness: 0.4 });
+    for (const s of [-1, 1]) {
+      add(new THREE.TorusGeometry(0.16, 0.022, 8, 28), frame, head, [s * 0.22, 0.1, 0.63]);
+      add(new THREE.CircleGeometry(0.15, 24), std(0xdff1ff, { transparent: true, opacity: 0.18, roughness: 0.05 }), head, [s * 0.22, 0.1, 0.632]);
+      add(new THREE.BoxGeometry(0.03, 0.03, 0.55), frame, head, [s * 0.4, 0.12, 0.38]);
+    }
+    add(new THREE.BoxGeometry(0.14, 0.025, 0.025), frame, head, [0, 0.13, 0.64]);
+  }
 
   // ----- Scene props (hidden until a talent animation needs them)
   const props = new THREE.Group();
@@ -758,7 +804,7 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
           spoon.rotation.z = -0.3 - lift * 0.9;
           T.armRX[1] = (-1.3 - lift * 1.1) * k; T.armRZ[1] = (-0.4 + lift * 0.2) * k;
           mood = lift > 0.6 ? "happy" : "neutral";
-          if (u > 3) M.skin.color.setHex(0xf7b8a0);
+          if (u > 3) M.skin.color.setHex(look ? shade(L.skin, 0.04, 0.14) : 0xf7b8a0);
           break;
         }
       }
@@ -893,10 +939,10 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
       if (mood === "angry") b.position.y = 0.3;
     }
     setMouth(mood === "angry" ? "sad" : mood);
-    if (!(st.scene === "adjika" && st.sceneT > 3)) M.skin.color.setHex(mood === "angry" ? 0xf6aa8e : COLORS.skin); // red in the face
+    if (!(st.scene === "adjika" && st.sceneT > 3)) M.skin.color.setHex(mood === "angry" ? (look ? shade(L.skin, 0.05, 0.12) : 0xf6aa8e) : L.skin); // red in the face
 
     // Sunglasses slide down from above and sit on the eyes
-    st.shades = lerp(st.shades, st.shadesOn ? 1 : 0, 1 - Math.exp(-dt * 7));
+    st.shades = lerp(st.shades, st.shadesOn || L.glasses === "sun" ? 1 : 0, 1 - Math.exp(-dt * 7));
     shades.visible = st.shades > 0.02;
     shades.position.y = 0.12 + (1 - st.shades) * 1.4;
 
@@ -985,16 +1031,39 @@ function schemeTexture() {
   return t;
 }
 
-// Red "23" for the shirt
-function numberTexture() {
+// Phil's look, and how a builder look maps onto the avatar
+function lookOf(look) {
+  const hex = (h, d) => (typeof h === "string" && /^#[0-9a-f]{6}$/i.test(h) ? parseInt(h.slice(1), 16) : d);
+  if (!look) return { skin: COLORS.skin, hair: COLORS.hair, eyes: COLORS.iris, top: COLORS.shirt, pants: COLORS.jeans, shoes: COLORS.shoe, hairStyle: "buzz", beard: "stubble", mustache: false, glasses: "none", width: 1, topType: "jersey", number: "23", numberColor: "#c8102e" };
+  const top = hex(look.top?.color, COLORS.shirt);
+  return {
+    skin: hex(look.skin, COLORS.skin), hair: hex(look.hair?.color, 0x6b4a2b), eyes: hex(look.eyes, COLORS.iris),
+    top, pants: hex(look.pants, COLORS.jeans), shoes: hex(look.shoes, COLORS.shoe),
+    hairStyle: look.hair?.style || "short", beard: look.beard || "none", mustache: !!look.mustache, glasses: look.glasses || "none",
+    width: look.build === "slim" ? 0.88 : look.build === "chubby" ? 1.14 : 1,
+    topType: look.top?.type || "tshirt",
+    number: look.top?.type === "jersey" ? String(look.number || "") : "",
+    numberColor: luminance(top) > 0.5 ? "#1b1b1f" : "#ffffff"
+  };
+}
+const luminance = (c) => (0.299 * ((c >> 16) & 255) + 0.587 * ((c >> 8) & 255) + 0.114 * (c & 255)) / 255;
+// Lighten (+) or darken (-) a color; red adds a flush
+function shade(c, k, red = 0) {
+  const ch = (v, extra) => Math.max(0, Math.min(255, Math.round(v + (k >= 0 ? (255 - v) * k : v * k) + extra * 255)));
+  const r = ch((c >> 16) & 255, red), g = ch((c >> 8) & 255, -red * 0.4), b = ch(c & 255, -red * 0.4);
+  return (r << 16) | (g << 8) | b;
+}
+
+// Number on the jersey
+function numberTexture(text = "23", color = "#c8102e") {
   const c = document.createElement("canvas");
   c.width = 256; c.height = 176;
   const g = c.getContext("2d");
-  g.fillStyle = "#c8102e";
-  g.font = "bold 150px Anton, Impact, sans-serif";
+  g.fillStyle = color;
+  g.font = `bold ${text.length > 2 ? 110 : 150}px Anton, Impact, sans-serif`;
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText("23", 128, 96);
+  g.fillText(text, 128, 96);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

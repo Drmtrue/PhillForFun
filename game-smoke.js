@@ -24,11 +24,20 @@ const LINES = {
   offline: { id: "smk_offline", mood: "smug", pri: 2, lines: ["Пока тебя не было, я не терял времени."] }
 };
 
+// ctx.skin (builder portals): { unit, item, itemPlural, upgrades: [[emoji, name, effect] x7] } renames everything
 export function mountSmoke(el, ctx) {
+  const sk = ctx.skin || null;
+  const UP = sk?.upgrades?.length === 7 ? UPGRADES.map((u, i) => ({ ...u, icon: sk.upgrades[i][0], name: sk.upgrades[i][1], desc: sk.upgrades[i][2] || u.desc })) : UPGRADES;
+  const T = {
+    hint: sk ? "клик!" : "клик = затяжка",
+    unit: sk ? cap(sk.unit) : "Дым",
+    items: sk ? cap(sk.itemPlural) : "Сигарет",
+    offline: (n) => (sk ? `Пока тебя не было, ${ctx.hero || "герой"} заработал ${n} (${sk.unit}).` : `Пока тебя не было, Фил накурил ${n} дыма.`)
+  };
   const st = { smoke: 0, total: 0, cigs: 0, puffs: 0, own: {}, last: Date.now(), ...ctx.store.get(KEY, {}) };
   const owned = (id) => st.own[id] || 0;
-  const perClick = () => 1 + UPGRADES.reduce((s, u) => s + (u.click || 0) * owned(u.id), 0);
-  const perSec = () => UPGRADES.reduce((s, u) => s + (u.rate || 0) * owned(u.id), 0);
+  const perClick = () => 1 + UP.reduce((s, u) => s + (u.click || 0) * owned(u.id), 0);
+  const perSec = () => UP.reduce((s, u) => s + (u.rate || 0) * owned(u.id), 0);
   const cost = (u) => Math.ceil(u.base * Math.pow(1.15, owned(u.id)));
   const save = () => { st.last = Date.now(); ctx.store.set(KEY, st); };
 
@@ -43,15 +52,15 @@ export function mountSmoke(el, ctx) {
             <rect class="smk-ash" x="80" y="28" width="12" height="24"/>
             <circle class="smk-ember" cx="270" cy="40" r="10"/>
           </svg>
-          <span class="smk-hint">клик = затяжка</span>
+          <span class="smk-hint">${T.hint}</span>
         </button>
         <div class="smk-fx" aria-hidden="true"></div>
       </div>
       <div class="game-stats smk-stats">
-        <div><span class="sb-label">Дым</span><b class="smk-smoke">0</b></div>
+        <div><span class="sb-label">${T.unit}</span><b class="smk-smoke">0</b></div>
         <div><span class="sb-label">За клик</span><b class="smk-click">1</b></div>
         <div><span class="sb-label">В секунду</span><b class="smk-rate">0</b></div>
-        <div><span class="sb-label">Сигарет</span><b class="smk-cigs">0</b></div>
+        <div><span class="sb-label">${T.items}</span><b class="smk-cigs">0</b></div>
       </div>
     </div>
     <div class="smk-shop"></div>`;
@@ -66,12 +75,12 @@ export function mountSmoke(el, ctx) {
     st.total += offline;
     const n = q(".smk-offline");
     n.hidden = false;
-    n.textContent = `Пока тебя не было, Фил накурил ${fmt(offline)} дыма.`;
+    n.textContent = T.offline(fmt(offline));
     ctx.onShow(() => ctx.say(LINES.offline), true);
   }
 
   // Shop buttons are built once and updated in place
-  const rows = UPGRADES.map((u) => {
+  const rows = UP.map((u) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "smk-up";
@@ -170,6 +179,8 @@ export function mountSmoke(el, ctx) {
   window.addEventListener("pagehide", save);
   render();
 }
+
+const cap = (s) => String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1);
 
 function fmt(x) {
   x = Math.floor(x);

@@ -1,4 +1,4 @@
-import { spinDetector, drawFace } from "./ballskin.js?v=202610251915";
+import { spinDetector, drawFace } from "./ballskin.js?v=202610260526";
 
 // Free throw after a wrong answer: a small court in a modal, one throw.
 // Resolves to { made, skipped, stats } where stats describe how the shot went (for achievements).

@@ -1,18 +1,44 @@
-import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251915";
-import { renderRmt } from "./rmt-page.js?v=202610251915";
-import { initHoop } from "./hoop.js?v=202610251915";
-import { freeThrow } from "./freethrow.js?v=202610251915";
-import { onSkinChange } from "./ballskin.js?v=202610251915";
-import { mountSmoke } from "./game-smoke.js?v=202610251915";
-import { mountFarm } from "./game-farm.js?v=202610251915";
-import { mountBath } from "./game-bath.js?v=202610251915";
-import { renderTree } from "./tree.js?v=202610251915";
-import { TALENTS } from "./talents.js?v=202610251915";
-import { initDebug } from "./debug.js?v=202610251915";
-import { initFeed } from "./feed.js?v=202610251915";
-import { initAvatar } from "./avatar.js?v=202610251915";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610260526";
+import { renderRmt } from "./rmt-page.js?v=202610260526";
+import { initHoop } from "./hoop.js?v=202610260526";
+import { freeThrow } from "./freethrow.js?v=202610260526";
+import { onSkinChange } from "./ballskin.js?v=202610260526";
+import { mountSmoke } from "./game-smoke.js?v=202610260526";
+import { mountFarm } from "./game-farm.js?v=202610260526";
+import { mountBath } from "./game-bath.js?v=202610260526";
+import { renderTree } from "./tree.js?v=202610260526";
+import { TALENTS, usePortalTalents } from "./talents.js?v=202610260526";
+import { SLUG, IS_PHIL, PORTAL, loadPortal, applyPortalPage, withPortal, hero } from "./portal.js?v=202610260526";
+import { initDebug } from "./debug.js?v=202610260526";
+import { initFeed } from "./feed.js?v=202610260526";
+import { initAvatar, overrideLines } from "./avatar.js?v=202610260526";
+import { setFaceSrc } from "./ballskin.js?v=202610260526";
 
-const phil = initAvatar({ onLine: philLine, onContext: () => debugCombo.rightClick() }); // Phil the mascot
+// ----- Which portal: Phil (default) or one made with the builder (?p=slug). Its content replaces Phil's.
+await loadPortal();
+const CFG = PORTAL.config;
+if (PORTAL.error) { applyPortalPage(); await new Promise(() => {}); } // "portal not found" page, nothing else runs
+if (!IS_PHIL && CFG) {
+  window.QUESTIONS = CFG.questions || [];
+  window.ACHIEVEMENTS = (window.ACHIEVEMENTS || [])
+    .filter((a) => CFG.achievements?.[a.id] || a.id === "all")
+    .map((a) => {
+      const [icon, title, desc] = CFG.achievements[a.id] || [a.icon, "Все ачивки", "Собрал все остальные ачивки портала."];
+      return { ...a, icon, title, desc, hint: a.hint ? a.hint.replace(/Фил[а-яё]*/g, hero("nom")) : a.hint };
+    });
+  overrideLines(CFG.lines);
+  usePortalTalents(CFG);
+  setFaceSrc(PORTAL.face);
+}
+applyPortalPage();
+
+const phil = initAvatar({
+  onLine: philLine,
+  onContext: () => debugCombo.rightClick(),
+  look: !IS_PHIL && CFG?.look ? { ...CFG.look, number: CFG.site?.emblemNumber } : null,
+  smokes: IS_PHIL || !!CFG?.lines?.smoke?.length,
+  fallbackFace: IS_PHIL ? null : PORTAL.face
+}); // the hero mascot
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -20,12 +46,14 @@ const LOCAL_KEY = "phill_quiz_scores";
 const ACH_KEY = "phill_quiz_ach";
 const LAST_SCORE_KEY = "phill_quiz_last";
 
+// Browser storage is per portal: Phil's keys stay as they were, other portals get a ":slug" suffix
+const skey = (key) => (IS_PHIL ? key : `${key}:${SLUG}`);
 const store = {
   get(key, fallback) {
-    try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch (_) { return fallback; }
+    try { const v = localStorage.getItem(skey(key)); return v == null ? fallback : JSON.parse(v); } catch (_) { return fallback; }
   },
   set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+    try { localStorage.setItem(skey(key), JSON.stringify(value)); } catch (_) {}
   }
 };
 
@@ -45,7 +73,7 @@ const API = API_URL.replace(/\/+$/, "");
 let debugOn = false; // debug mode: nothing is written to the server (see debug.js)
 async function api(path, opts = {}) {
   if (debugOn && opts.method && opts.method !== "GET") return {}; // swallow every write in debug mode
-  const res = await fetch(API + path, {
+  const res = await fetch(API + withPortal(path), {
     ...opts,
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) }
   });
@@ -450,7 +478,8 @@ function startGame(name) {
     newAch: [],
     done: false
   };
-  if (/^(фил|филипп|phil|phill|x23x)$/i.test(name.trim())) unlock("selfcheck");
+  const selfNames = IS_PHIL ? ["фил", "филипп", "phil", "phill", "x23x"] : [hero("nom"), CFG?.persona?.nickname].filter(Boolean).map((x) => x.toLowerCase());
+  if (selfNames.includes(name.trim().toLowerCase())) unlock("selfcheck");
   show("screen-quiz");
   renderQuestion();
   phil.say("start", { force: true });
@@ -739,8 +768,8 @@ function clicks(el, needed, windowMs, onDone, onEach) {
   });
 }
 
-// 1. Jersey: three quick clicks flip 23 <-> 45 (the comeback number)
-clicks($("jersey"), 3, 1200, () => {
+// 1. Jersey: three quick clicks flip 23 <-> 45 (the comeback number) — Phil only
+if (IS_PHIL) clicks($("jersey"), 3, 1200, () => {
   const num = $("jersey-num");
   const comeback = num.textContent === "23";
   $("jersey").classList.remove("flip");
@@ -756,8 +785,9 @@ clicks($("jersey"), 3, 1200, () => {
   }
 });
 
-// 2. Smoke above the jersey: five puffs
-clicks($("smoke"), 5, 2500, () => {
+// 2. Smoke above the jersey: five puffs — Phil only
+if (!IS_PHIL) $("smoke")?.remove();
+else clicks($("smoke"), 5, 2500, () => {
   sfx.egg();
   overlay(`<p class="overlay-big">💨</p><h2>Фил вышел покурить</h2><p>Вернётся через 5 минут. По его часам — через полтора часа.</p>`, "smoky");
   unlock("smoke");
@@ -847,7 +877,7 @@ $("sb-ball").addEventListener("click", () => {
 });
 
 // 5. "Где ты в этой схеме?" opens the actual scheme
-$("scheme-link").addEventListener("click", () => {
+$("scheme-link")?.addEventListener("click", () => {
   sfx.egg();
   overlay(`
     <h2>Схема</h2>
@@ -875,7 +905,7 @@ $("scheme-link").addEventListener("click", () => {
 });
 
 // 6. Title: three clicks try to "transform" the unemployed
-clicks($("title-word"), 3, 1500, () => {
+if (IS_PHIL) clicks($("title-word"), 3, 1500, () => {
   const w = $("title-word");
   if (w.dataset.busy) return;
   w.dataset.busy = "1";
@@ -911,6 +941,7 @@ document.addEventListener("keydown", (e) => {
   }
 
   if (e.key && e.key.length === 1) typed = (typed + e.key.toLowerCase()).slice(-12);
+  if (!IS_PHIL) return; // the typed words below are Phil's inside jokes
   if (/x23x$|ч23ч$/.test(typed)) {
     typed = "";
     sfx.egg();
@@ -1097,12 +1128,18 @@ $("ft-practice").addEventListener("click", async () => {
 renderPractice();
 
 /* ---------- Mini-games with their own views (#/games/<id>) ---------- */
+const GAME_POOL = {
+  smk_buy: "correct", smk_cig: "click", smk_factory: "pwned", smk_offline: "idle",
+  farm_start: "start", farm_stack: "pwned", farm_sell: "correct", farm_scam: "blame", farm_event: "wrong", farm_burn: "endBad", farm_end: "endGood",
+  bath_start: "start", bath_hot: "blame", bath_cold: "wrong", bath_sleep: "endZero", bath_phone_lost: "blame", bath_catch: "correct", bath_splash: "click", bath_ms: "achievement"
+};
 let lastPrices = null;
 const gameShowHooks = {};
 function gameCtx(id) {
   return {
     unlock,
-    say: (pool, opts) => phil.say(pool, opts),
+    // Builder portals: game-specific pools map onto the portal's general lines
+    say: (pool, opts) => phil.say(IS_PHIL ? pool : (GAME_POOL[pool.id] || "click"), opts),
     phil,
     sfx,
     store,
@@ -1110,7 +1147,10 @@ function gameCtx(id) {
     divinePrice: () => lastPrices?.find((r) => r.short === "PoE 1")?.price || null,
     onShow: (fn, once) => (gameShowHooks[id] ||= []).push({ fn, once }),
     log: logEvent,
-    scene: (name) => phil.playScene(name)
+    scene: (name) => phil.playScene(name),
+    skin: IS_PHIL ? null : CFG?.games?.[{ smoke: "clicker", farm: "farm", bath: "relax" }[id]] || null,
+    hero: hero("nom"),
+    face: IS_PHIL ? null : PORTAL.face
   };
 }
 mountSmoke($("g-smoke"), gameCtx("smoke"));
@@ -1119,7 +1159,7 @@ mountBath($("g-bath"), gameCtx("bath"));
 const GAMES = ["smoke", "farm", "bath"];
 
 /* ---------- Sections (hash routes) ---------- */
-const PAGES = ["home", "quiz", "rmt", "games", "phil", "ach"];
+const PAGES = IS_PHIL ? ["home", "quiz", "rmt", "games", "phil", "ach"] : ["home", "quiz", "games", "phil", "ach"];
 function route() {
   const [, name, sub] = location.hash.match(/^#\/?([\w-]+)?\/?([\w-]+)?/) || [];
   const page = PAGES.includes(name) ? name : "home";
@@ -1148,13 +1188,14 @@ route();
 const SEEN_TALENTS_KEY = "phill_talents_seen";
 let philXp = {};
 async function loadProgress() {
-  if (!API) { renderTree($("phil-tree"), phil.progress, {}, 0); return; }
+  const H = { nom: hero("nom"), gen: hero("gen") };
+  if (!API) { renderTree($("phil-tree"), phil.progress, {}, 0, H, !IS_PHIL); return; }
   try {
     const p = await api("/phil");
     philXp = p.xp || {};
     if (debugOn) return;
     phil.setProgress(philXp);
-    renderTree($("phil-tree"), phil.progress, philXp, p.players || 0);
+    renderTree($("phil-tree"), phil.progress, philXp, p.players || 0, H, !IS_PHIL);
     // Announce talents that opened since this browser last looked (not the very first load)
     const seen = new Set(store.get(SEEN_TALENTS_KEY, null) || []);
     const firstTime = !store.get(SEEN_TALENTS_KEY, null);
@@ -1162,7 +1203,7 @@ async function loadProgress() {
     store.set(SEEN_TALENTS_KEY, [...phil.progress.unlocked]);
     if (!firstTime && news.length) {
       const t = ACH_TALENT(news[0]);
-      toast(`🌳 Новый талант Фила: ${t.icon} ${t.title}`, news.length > 1 ? `И ещё ${news.length - 1}. Смотри раздел «Таланты».` : t.desc);
+      toast(`🌳 Новый талант: ${t.icon} ${t.title}`, news.length > 1 ? `И ещё ${news.length - 1}. Смотри раздел «Таланты».` : t.desc);
       sfx.achievement();
       if (t.anim) setTimeout(() => phil.playScene(t.anim), 1500);
     }
@@ -1176,6 +1217,8 @@ const feed = API ? initFeed($("feed"), {
   api,
   achById: ACH_BY_ID,
   verdictFor,
+  hero: { nom: hero("nom"), gen: hero("gen"), pre: hero("pre") },
+  games: IS_PHIL ? null : { farm: CFG?.games?.farm?.title || "Фарм", relax: CFG?.games?.relax?.title || "Отдых", clicker: CFG?.games?.clicker?.title || "Кликер" },
   isVisible: () => document.body.dataset.page === "home"
 }) : null;
 if (!API) $("feed").hidden = true;
@@ -1184,7 +1227,7 @@ if (!API) $("feed").hidden = true;
 function logEvent(type, data = {}) {
   if (!API || debugOn) return;
   const body = JSON.stringify({ type, name: getName() || "Гость", data });
-  fetch(`${API}/events`, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
+  fetch(API + withPortal("/events"), { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
     .then(() => {
       if (feed && document.body.dataset.page === "home") setTimeout(() => feed.refresh(), 800);
       setTimeout(loadProgress, 1200);
@@ -1217,7 +1260,7 @@ window.addEventListener("pagehide", () => {
   const answered = game.questions.filter((q) => q.tries).length;
   if (!answered) return;
   const body = JSON.stringify({ type: "quiz_quit", name: game.name, data: { at: game.i + 1, total: game.questions.length, score: game.score } });
-  navigator.sendBeacon?.(`${API}/events`, new Blob([body], { type: "text/plain" }));
+  navigator.sendBeacon?.(API + withPortal("/events"), new Blob([body], { type: "text/plain" }));
 });
 
 /* ---------- Debug mode: 5 clicks on the jersey, then 2 right-clicks on Phil, within 10 s ---------- */
@@ -1253,5 +1296,7 @@ syncAch(getName()); // also syncs baskets
 bumpIdle();
 renderBoard($("board-start"));
 loadGenerated().then(updateFoot);
-loadPrices();
-setInterval(loadPrices, 10 * 60 * 1000);
+if (IS_PHIL) {
+  loadPrices();
+  setInterval(loadPrices, 10 * 60 * 1000);
+}

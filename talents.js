@@ -2,7 +2,7 @@
 // unlocks are derived here. Level n of a branch needs xpForLevel(n) total XP in that branch.
 // Each talent unlocks an animation (`anim`, played by phil3d.js) and/or a set of sharp lines (`lines`).
 
-export const BRANCHES = {
+export let BRANCHES = {
   hoops: { icon: "🏀", title: "Баскетбол", desc: "Броски в кольцо, штрафные, попадания Фила", stat: "Бросок" },
   farm: { icon: "💎", title: "РМТ-фарм", desc: "Лиги в «Фарме диванов»", stat: "Жадность" },
   chill: { icon: "🛁", title: "Релакс", desc: "Ванна, перекуры, комментарии Фила", stat: "Дзен" },
@@ -19,7 +19,7 @@ export function levelOf(xp) {
   return n;
 }
 
-export const TALENTS = [
+export let TALENTS = [
   // ----- Баскетбол
   { id: "dribble", branch: "hoops", level: 1, icon: "🏀", title: "Дриблинг", desc: "Фил стучит мячом об пол, пока никто не смотрит.", anim: "dribble" },
   { id: "spin", branch: "hoops", level: 2, icon: "🌀", title: "Мяч на пальце", desc: "Крутит мяч на пальце, как в рекламе.", anim: "spin" },
@@ -55,7 +55,7 @@ export const TALENTS = [
 ];
 
 // Lines unlocked by talents; each pool is used by avatar.js like its built-in pools
-export const TALENT_LINES = {
+export let TALENT_LINES = {
   trash_hoops: {
     basket: ["Залетело? Повезло. Повтори.", "Ладно, засчитано. Но форма — ужас.", "Так и я могу. С закрытыми глазами. В теории."],
     miss: ["Это был бросок или ты мяч ронял?", "Кольцо вон там, если что.", "Мой дед так кидал. Он тоже промахивался."],
@@ -99,6 +99,33 @@ export const TALENT_LINES = {
     endBad: ["Я предупреждал. Схема не врёт."]
   }
 };
+
+// A builder portal brings its own 10 animations, branch names and sharp line packs.
+// Levels inside each branch are spread from 1 to 10 in the order the portal lists them.
+const BRANCH_DESC = {
+  hoops: "Броски в кольцо, штрафные, броски героя",
+  farm: "Раунды экономической мини-игры",
+  chill: "Расслабляющая игра, кликер, реплики героя",
+  mind: "Квизы, факты, ачивки"
+};
+export function usePortalTalents(cfg) {
+  if (!cfg?.talents?.length) return;
+  const keys = ["hoops", "farm", "chill", "mind"];
+  BRANCHES = Object.fromEntries(keys.map((k) => {
+    const b = cfg.branches?.[k] || {};
+    return [k, { icon: b.icon || "⭐", title: b.title || k, desc: BRANCH_DESC[k], stat: b.stat || b.title || k }];
+  }));
+  const items = [
+    ...cfg.talents.map((t) => ({ id: `a_${t.anim}`, branch: t.branch, icon: t.icon, title: t.title, desc: t.desc, anim: t.anim })),
+    ...(cfg.sharp || []).map((sp) => ({ id: sp.id, branch: sp.branch, icon: sp.icon, title: sp.title, desc: sp.desc, lines: sp.id }))
+  ];
+  for (const k of keys) {
+    const list = items.filter((t) => t.branch === k);
+    list.forEach((t, i) => { t.level = list.length === 1 ? 1 : Math.round(1 + (i * 9) / (list.length - 1)); });
+  }
+  TALENTS = items.sort((a, b) => keys.indexOf(a.branch) - keys.indexOf(b.branch) || a.level - b.level);
+  TALENT_LINES = Object.fromEntries((cfg.sharp || []).map((sp) => [sp.id, sp.lines || {}]));
+}
 
 // Everything derived from the server's per-branch XP
 export function progressFrom(xp) {

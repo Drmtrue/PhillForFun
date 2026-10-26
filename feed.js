@@ -11,7 +11,8 @@ const CATEGORY = {
   phil_shot: "phil", phil_say: "phil",
   ach: "ach"
 };
-const FILTERS = [["all", "Все"], ["quiz", "Квиз"], ["games", "Игры"], ["phil", "Фил"], ["ach", "Ачивки"]];
+// The hero's name (Phil by default) and game names come from ctx: { hero: { nom, gen, pre }, games: { farm, relax, clicker } }
+const filtersFor = (ctx) => [["all", "Все"], ["quiz", "Квиз"], ["games", "Игры"], ["phil", ctx.hero.nom], ["ach", "Ачивки"]];
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const plural = (n, one, few, many) => {
@@ -40,6 +41,7 @@ function dayLabel(ts) {
 function describe(e, ctx) {
   const n = `<b>${esc(e.name)}</b>`;
   const d = e.data || {};
+  const H = ctx.hero, G = ctx.games;
   switch (e.type) {
     case "quiz_finish": {
       const v = ctx.verdictFor ? ctx.verdictFor(d.score, d.total)?.title : "";
@@ -48,7 +50,7 @@ function describe(e, ctx) {
     case "quiz_quit":
       return ["🚪", `${n} сбежал с квиза на ${d.at}-м вопросе из ${d.total}${d.score != null ? ` (${d.score} ${plural(d.score, "очко", "очка", "очков")})` : ""}`];
     case "fact_added":
-      return ["📝", `${n} рассказал о Филе: «${esc(d.fact)}» — Root AI сделал ${d.n} ${plural(d.n, "вопрос", "вопроса", "вопросов")}`];
+      return ["📝", `${n} рассказал о ${esc(H.pre)}: «${esc(d.fact)}» — Root AI сделал ${d.n} ${plural(d.n, "вопрос", "вопроса", "вопросов")}`];
     case "ach": {
       const a = ctx.achById[d.id];
       return [a?.icon || "🏆", a ? `${n} ${a.secret ? "нашёл пасхалку" : "получил ачивку"} «${esc(a.title)}»` : `${n} получил ачивку`];
@@ -57,20 +59,23 @@ function describe(e, ctx) {
       return ["🏀", `${n} ${d.n > 1 ? `забил ${d.n} ${plural(d.n, "мяч", "мяча", "мячей")}` : "забил мяч"} в боковое кольцо`];
     case "phil_shot":
       return d.made
-        ? ["🕶️", `<b>Фил</b> попал в кольцо у ${n}! Те самые 5%.${d.line ? ` «${esc(d.line)}»` : ""}`]
-        : ["🧱", `<b>Фил</b> промазал у ${n}.${d.line ? ` «${esc(d.line)}»` : ""}`];
+        ? ["🕶️", `<b>${esc(H.nom)}</b> попал в кольцо у ${n}! Те самые 5%.${d.line ? ` «${esc(d.line)}»` : ""}`]
+        : ["🧱", `<b>${esc(H.nom)}</b> промазал у ${n}.${d.line ? ` «${esc(d.line)}»` : ""}`];
     case "phil_say":
-      return ["💬", `<b>Фил</b> у ${n}: «${esc(d.line)}»`];
+      return ["💬", `<b>${esc(H.nom)}</b> у ${n}: «${esc(d.line)}»`];
     case "ft_session":
       return ["🎯", `${n} отработал штрафные: ${d.made} из ${d.shots}, лучшая серия ${d.best}`];
     case "farm_end":
+      if (G) return ["💰", `${n} сыграл в «${esc(G.farm)}»: <strong>${num(d.rub)}</strong>, продано ${num(d.sold)}` + (d.burnt ? `, ${num(d.burnt)} пропало` : "")];
       return ["💎", `${n} закрыл лигу в «Фарме диванов»: <strong>${num(d.rub)} ₽</strong>, продал ${num(d.sold)} Divine` +
         (d.burnt ? `, ${num(d.burnt)} сгорело в Стандарт` : "") + (d.scammed ? ". Скамнули!" : "")];
     case "bath_end": {
       const why = { sleep: "уснул", hot: "сварился", cold: "замёрз", phone: "утопил телефон" }[d.why] || "вылез";
+      if (G) return ["🧘", `${n} продержался в «${esc(G.relax)}» <strong>${num(d.sec)} с</strong> — ${why}`];
       return ["🛁", `${n} продержал Фила в ванне <strong>${num(d.sec)} с</strong> — ${why}`];
     }
     case "smoke_milestone":
+      if (G) return ["⭐", d.upgrade ? `${n} купил «${esc(d.upgrade)}» в «${esc(G.clicker)}»` : `${n}: уже ${num(d.cigs)} в «${esc(G.clicker)}»`];
       return ["🚬", d.upgrade ? `${n} построил «${esc(d.upgrade)}» в перекур-кликере` : `${n} выкурил уже ${num(d.cigs)} ${plural(d.cigs, "сигарету", "сигареты", "сигарет")} в перекур-кликере`];
     default:
       return ["•", `${n}: ${esc(e.type)}`];
@@ -91,7 +96,8 @@ export function initFeed(root, ctx) {
   const seg = root.querySelector(".feed-filter");
   let events = [], filter = "all", freshIds = new Set(), exhausted = false;
 
-  for (const [id, label] of FILTERS) {
+  ctx.hero = ctx.hero || { nom: "Фил", gen: "Фила", pre: "Филе" };
+  for (const [id, label] of filtersFor(ctx)) {
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = label;

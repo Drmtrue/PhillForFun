@@ -1,4 +1,4 @@
-import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610251915";
+import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610260526";
 
 // Phil the mascot: a 3D cartoon Phil who walks along the bottom of the screen (phil3d.js), with a flat
 // anime-style SVG badge as the fallback. He reacts to game events with a speech bubble and now and
@@ -285,7 +285,17 @@ const SVG = `
 const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug", blame: "angry", pwned: "smug" };
 
 // onLine(key, text): called with every line Phil says (key is the LINES name or the pool id), e.g. for the event feed
-export function initAvatar({ onLine, onContext } = {}) {
+// Builder portals replace Phil's lines with their own (a pool keeps its mood and priority)
+export function overrideLines(lines) {
+  for (const [key, list] of Object.entries(lines || {})) {
+    if (!LINES[key] || !Array.isArray(list) || !list.length) continue;
+    LINES[key] = { ...LINES[key], lines: list.map((t) => String(t)) };
+  }
+}
+
+// look: appearance for the 3D avatar (builder portals); smokes: whether the hero takes smoke breaks
+// fallbackFace: photo for the flat fallback on builder portals (Phil's drawn face is only for Phil)
+export function initAvatar({ onLine, onContext, look = null, smokes = true, fallbackFace = null } = {}) {
   const root = document.createElement("div");
   root.className = "phil-av";
   root.dataset.mood = "neutral";
@@ -298,10 +308,11 @@ export function initAvatar({ onLine, onContext } = {}) {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251915")
+  import("./phil3d.js?v=202610260526")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, {
         bubble,
+        look,
         onClick: () => say("click", { force: true }),
         onContext: () => { if (!(onContext && onContext() === false)) shootNow(); } // right click: go shoot now (a hook may swallow it)
       });
@@ -313,7 +324,7 @@ export function initAvatar({ onLine, onContext } = {}) {
       face.type = "button";
       face.className = "phil-face";
       face.title = "Фил";
-      face.innerHTML = SVG;
+      face.innerHTML = look ? (fallbackFace ? `<img src="${fallbackFace}" alt="" class="phil-photo">` : '<span class="phil-photo">🙂</span>') : SVG;
       face.addEventListener("click", () => say("click", { force: true }));
       face.addEventListener("contextmenu", (e) => { e.preventDefault(); onContext && onContext(); });
       root.append(face);
@@ -456,7 +467,7 @@ export function initAvatar({ onLine, onContext } = {}) {
   // A smoke break every so often, his signature move
   (function scheduleSmoke() {
     setTimeout(() => {
-      if (!document.hidden && bubble.hidden && !isSmoking()) {
+      if (smokes && !document.hidden && bubble.hidden && !isSmoking()) {
         smoke();
         setTimeout(() => say("smoke"), 2600);
       }
