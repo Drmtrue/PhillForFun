@@ -127,6 +127,7 @@ export function mountBath(el, ctx) {
     const sec = Math.floor(s.t);
     const rec = sec > best();
     if (rec) ctx.store.set(KEY, sec);
+    ctx.log?.("bath_end", { sec, why, record: rec });
     q(".bath-over b").textContent = `${reason} на ${sec}-й секунде${rec ? " · новый рекорд!" : ""}`;
     q(".bath-over").hidden = false;
     render();

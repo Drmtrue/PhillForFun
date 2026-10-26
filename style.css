@@ -1038,3 +1038,38 @@ body.hoop-on .hoop-hud { display: block; }
 @media (max-width: 520px) { .rmt-calc { grid-template-columns: 1fr; } }
 .rmt-card.goal .rmt-big { font-size: 32px; }
 .rmt-method { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--muted); font-size: 14px; }
+
+/* ---------- Home: event feed ---------- */
+.feed { margin-top: 10px; }
+.feed-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.feed-head h2 { font-size: 28px; }
+.feed-live { display: inline-flex; align-items: center; gap: 6px; color: var(--green); border-color: rgba(79, 209, 122, .4); }
+.feed-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.6s ease-in-out infinite; }
+.feed-filter { margin-bottom: 12px; flex-wrap: wrap; }
+.feed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.feed-day { margin: 10px 0 2px; font: 800 12px "Manrope", sans-serif; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.feed-day:first-child { margin-top: 0; }
+.feed-item {
+  display: grid; grid-template-columns: 34px 1fr auto; align-items: start; gap: 10px;
+  padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line);
+  border-left: 3px solid var(--cat, var(--line));
+}
+.feed-item.cat-quiz { --cat: var(--red); }
+.feed-item.cat-games { --cat: #3b8fe8; }
+.feed-item.cat-phil { --cat: var(--led); }
+.feed-item.cat-ach { --cat: var(--green); }
+.feed-item.fresh { animation: feed-in .6s ease-out; }
+@keyframes feed-in { from { background: rgba(255, 176, 32, .18); transform: translateY(-6px); opacity: 0; } }
+.feed-icon { font-size: 22px; line-height: 1.2; text-align: center; }
+.feed-item p { margin: 0; font-size: 14.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.feed-item p b { color: var(--text); }
+.feed-item p strong { color: var(--led); font-weight: 800; }
+.feed-item time { font-size: 12px; color: var(--muted); white-space: nowrap; padding-top: 2px; }
+.feed-empty { padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: 12px; }
+.feed-more { display: block; width: 100%; margin-top: 12px; }
+@media (max-width: 480px) {
+  .feed-item { grid-template-columns: 26px 1fr; }
+  .feed-item time { grid-column: 2; padding: 0; }
+  .feed-icon { font-size: 18px; }
+}
+@media (max-width: 480px) { .feed-head h2 { font-size: 22px; } .feed-live { font-size: 11px; } }

@@ -276,7 +276,8 @@ const SVG = `
 // Body movement per event for the 3D Phil (falls back to the event's mood)
 const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug", blame: "angry", pwned: "smug" };
 
-export function initAvatar() {
+// onLine(key, text): called with every line Phil says (key is the LINES name or the pool id), e.g. for the event feed
+export function initAvatar({ onLine } = {}) {
   const root = document.createElement("div");
   root.className = "phil-av";
   root.dataset.mood = "neutral";
@@ -289,7 +290,7 @@ export function initAvatar() {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251543")
+  import("./phil3d.js?v=202610251836")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, {
         bubble,
@@ -385,7 +386,9 @@ export function initAvatar() {
       if (busy && current && current.pri > ev.pri) return;
       if (ev.pri <= 1 && now - lastSaid < 3500) return;
     }
-    const line = pickLine(typeof key === "string" ? key : ev.id, ev);
+    const lineKey = typeof key === "string" ? key : ev.id;
+    const line = pickLine(lineKey, ev);
+    if (onLine) { try { onLine(lineKey, line.t, ev); } catch (_) { /* never break Phil */ } }
     current = { pri: ev.pri };
     lastSaid = now;
     bubble.textContent = line.t;

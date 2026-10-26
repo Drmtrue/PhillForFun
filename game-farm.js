@@ -60,7 +60,7 @@ export function mountFarm(el, ctx) {
     const real = ctx.divinePrice();
     s = {
       day: 0, divs: 0, rub: 0, base: real || 1.2, priceMult: 1, noise: 1, hype: 1, hypeUntil: -1,
-      dropMult: 1, dropUntil: -1, afkUntil: -1, history: [], sold: 0, running: true, lastEvent: -5
+      dropMult: 1, dropUntil: -1, afkUntil: -1, history: [], sold: 0, running: true, lastEvent: -5, scammed: false
     };
     s.history.push(price());
     q(".fm-start").hidden = true;
@@ -119,6 +119,7 @@ export function mountFarm(el, ctx) {
       q(".fm-event").textContent = `🚨 Скам: покупатель открыл арбитраж, пришла только половина (${fmtRub(money)}).`;
       ctx.say(LINES.scam, { force: true });
       ctx.unlock("farm_scam");
+      s.scammed = true;
     } else ctx.say(LINES.sell);
     s.rub += money;
     ctx.sfx.swish();
@@ -137,6 +138,7 @@ export function mountFarm(el, ctx) {
       `Итог лиги: ${fmtRub(s.rub)}. До компьютера осталось ${fmtRub(left)}.`;
     ctx.say(burnt ? LINES.burn : LINES.end, { force: true });
     if (s.rub > best()) ctx.store.set(KEY, s.rub);
+    ctx.log?.("farm_end", { rub: Math.round(s.rub), sold: s.sold, burnt, scammed: s.scammed });
     q(".fm-start").hidden = false;
     q(".fm-start").textContent = "Новая лига";
     q(".fm-run").disabled = true;

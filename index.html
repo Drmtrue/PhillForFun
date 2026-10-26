@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610251543">
+  <link rel="stylesheet" href="style.css?v=202610251836">
 </head>
 <body>
   <!-- Background: court lines and bath bubbles -->
@@ -67,32 +67,8 @@
         </div>
       </div>
 
-      <div class="hub">
-        <a class="hub-card" href="#/quiz">
-          <span class="hub-icon" aria-hidden="true">🧠</span>
-          <h2>Квиз</h2>
-          <p>10 вопросов о Филе. Кто знает его лучше всех?</p>
-          <span class="hub-meta" id="hub-quiz">Таблица лидеров и факты от игроков</span>
-        </a>
-        <a class="hub-card" href="#/rmt">
-          <span class="hub-icon" aria-hidden="true">💎</span>
-          <h2>Биржа РМТ</h2>
-          <p>Цены на Divine Orb с FunPay и копилка на новый компьютер.</p>
-          <span class="hub-meta" id="hub-rmt">Загружаю цены…</span>
-        </a>
-        <a class="hub-card" href="#/games">
-          <span class="hub-icon" aria-hidden="true">🎮</span>
-          <h2>Мини-игры</h2>
-          <p>Штрафные, перекур-кликер, фарм диванов и ванна.</p>
-          <span class="hub-meta" id="hub-games">4 игры + боковое кольцо</span>
-        </a>
-        <a class="hub-card" href="#/ach">
-          <span class="hub-icon" aria-hidden="true">🏆</span>
-          <h2>Ачивки</h2>
-          <p>Общие для всего сайта, включая пасхалки.</p>
-          <span class="hub-meta" id="hub-ach">0/0</span>
-        </a>
-      </div>
+      <!-- Event feed: what everyone did on the site -->
+      <section class="feed" id="feed"></section>
     </section>
 
     <!-- Quiz -->
@@ -296,8 +272,8 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="hoop-hud" id="hoop-hud" title="Попадания в боковое кольцо. Считаются отдельно от ответов.">🏀 <b id="hoop-count">0</b> <span>в кольцо</span></div>
 
-  <script src="questions.js?v=202610251543"></script>
-  <script src="achievements.js?v=202610251543"></script>
-  <script type="module" src="app.js?v=202610251543"></script>
+  <script src="questions.js?v=202610251836"></script>
+  <script src="achievements.js?v=202610251836"></script>
+  <script type="module" src="app.js?v=202610251836"></script>
 </body>
 </html>

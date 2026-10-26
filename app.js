@@ -1,14 +1,15 @@
-import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251543";
-import { renderRmt } from "./rmt-page.js?v=202610251543";
-import { initHoop } from "./hoop.js?v=202610251543";
-import { freeThrow } from "./freethrow.js?v=202610251543";
-import { onSkinChange } from "./ballskin.js?v=202610251543";
-import { mountSmoke } from "./game-smoke.js?v=202610251543";
-import { mountFarm } from "./game-farm.js?v=202610251543";
-import { mountBath } from "./game-bath.js?v=202610251543";
-import { initAvatar } from "./avatar.js?v=202610251543";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251836";
+import { renderRmt } from "./rmt-page.js?v=202610251836";
+import { initHoop } from "./hoop.js?v=202610251836";
+import { freeThrow } from "./freethrow.js?v=202610251836";
+import { onSkinChange } from "./ballskin.js?v=202610251836";
+import { mountSmoke } from "./game-smoke.js?v=202610251836";
+import { mountFarm } from "./game-farm.js?v=202610251836";
+import { mountBath } from "./game-bath.js?v=202610251836";
+import { initFeed } from "./feed.js?v=202610251836";
+import { initAvatar } from "./avatar.js?v=202610251836";
 
-const phil = initAvatar(); // anime Phil in the corner, comments on what happens
+const phil = initAvatar({ onLine: philLine }); // Phil the mascot: comments on what happens
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -201,7 +202,6 @@ function renderAch() {
   const grid = $("ach-grid");
   if (!grid) return;
   $("ach-count").textContent = `${ACH.filter((a) => unlocked.has(a.id)).length}/${ACH.length}`;
-  $("hub-ach").textContent = `Открыто ${$("ach-count").textContent}`;
   grid.innerHTML = "";
   for (const a of ACH) {
     const got = unlocked.has(a.id);
@@ -962,7 +962,6 @@ async function loadPrices() {
     renderRmt($("rmt-root"), rows, data, store);
     $("rmt-loading").hidden = true;
     lastPrices = rows;
-    $("hub-rmt").textContent = rows.filter((r) => r.price != null).map((r) => `${r.short}: ${fmtPrice(r.price)} ₽`).join(" · ") || "Цены FunPay";
   } catch (e) { console.error(e); }
 }
 
@@ -1054,6 +1053,7 @@ function renderPractice() {
 }
 $("ft-practice").addEventListener("click", async () => {
   $("ft-practice").disabled = true;
+  const session = { made: 0, shots: 0, best: 0 };
   // Throw after throw until the player presses "Хватит"
   for (;;) {
     const res = await freeThrow({
@@ -1068,9 +1068,12 @@ $("ft-practice").addEventListener("click", async () => {
     });
     if (res.skipped) break;
     ftp.shots++;
+    session.shots++;
     if (res.made) {
       ftp.made++;
+      session.made++;
       ftp.streak++;
+      session.best = Math.max(session.best, ftp.streak);
       ftp.best = Math.max(ftp.best, ftp.streak);
       if (ftp.streak >= 5) unlock("pr_streak5");
       if (ftp.streak >= 10) unlock("pr_streak10");
@@ -1083,6 +1086,7 @@ $("ft-practice").addEventListener("click", async () => {
     renderPractice();
   }
   $("ft-practice").disabled = false;
+  if (session.shots) logEvent("ft_session", session);
 });
 renderPractice();
 
@@ -1098,7 +1102,8 @@ function gameCtx(id) {
     store,
     goalRub: RMT_GOAL.priceRub,
     divinePrice: () => lastPrices?.find((r) => r.short === "PoE 1")?.price || null,
-    onShow: (fn, once) => (gameShowHooks[id] ||= []).push({ fn, once })
+    onShow: (fn, once) => (gameShowHooks[id] ||= []).push({ fn, once }),
+    log: logEvent
   };
 }
 mountSmoke($("g-smoke"), gameCtx("smoke"));
@@ -1131,13 +1136,48 @@ function route() {
 window.addEventListener("hashchange", route);
 route();
 
-async function renderHubQuiz() {
-  try {
-    const top = (await loadScores())[0];
-    $("hub-quiz").textContent = top ? `Лидер: ${top.name} · ${fmtAvg(top.avg)} в среднем` : "Пока никто не играл";
-  } catch (_) { /* keep the default text */ }
+
+/* ---------- Event feed (home page) ---------- */
+const feed = API ? initFeed($("feed"), {
+  api,
+  achById: ACH_BY_ID,
+  verdictFor,
+  isVisible: () => document.body.dataset.page === "home"
+}) : null;
+if (!API) $("feed").hidden = true;
+
+// Post an event the server cannot see by itself (game results, Phil's shots and lines)
+function logEvent(type, data = {}) {
+  if (!API) return;
+  const body = JSON.stringify({ type, name: getName() || "Гость", data });
+  fetch(`${API}/events`, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
+    .then(() => feed && document.body.dataset.page === "home" && setTimeout(() => feed.refresh(), 800))
+    .catch(() => {});
 }
-renderHubQuiz();
+
+// Phil's lines: shot results always; notable comments (not routine quiz reactions) at most once every 3 minutes
+const PHIL_FEED_LINES = new Set(["click", "idle", "faceOn", "faceOff", "dunk", "endPerfect", "endZero", "endGood", "endBad", "noHoop"]);
+let lastPhilSay = 0, philCalledShot = false;
+function philLine(key, text, ev) {
+  if (key === "callShot") { philCalledShot = true; return; }
+  if (key === "blame" || key === "pwned") {
+    logEvent("phil_shot", { made: key === "pwned", line: text, called: key === "pwned" && philCalledShot });
+    philCalledShot = false;
+    return;
+  }
+  if (!PHIL_FEED_LINES.has(key) || Date.now() - lastPhilSay < 180000) return;
+  lastPhilSay = Date.now();
+  logEvent("phil_say", { line: text });
+}
+
+// Leaving the site in the middle of a quiz counts as running away from it
+window.addEventListener("pagehide", () => {
+  if (!API || !game || game.done) return;
+  const answered = game.questions.filter((q) => q.tries).length;
+  if (!answered) return;
+  const body = JSON.stringify({ type: "quiz_quit", name: game.name, data: { at: game.i + 1, total: game.questions.length, score: game.score } });
+  navigator.sendBeacon?.(`${API}/events`, new Blob([body], { type: "text/plain" }));
+});
 
 /* ---------- Startup ---------- */
 $("player-name").value = getName();

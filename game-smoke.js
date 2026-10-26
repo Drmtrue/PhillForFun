@@ -82,7 +82,11 @@ export function mountSmoke(el, ctx) {
       st.smoke -= c;
       st.own[u.id] = owned(u.id) + 1;
       ctx.sfx.pop(0.6);
-      if (u.id === "factory") { ctx.unlock("smk_factory"); ctx.say(LINES.factory, { force: true }); }
+      if (u.id === "factory") {
+        ctx.unlock("smk_factory");
+        ctx.say(LINES.factory, { force: true });
+        if (owned(u.id) === 1) ctx.log?.("smoke_milestone", { upgrade: u.name });
+      }
       else ctx.say(LINES.buy);
       save();
       render();
@@ -107,6 +111,7 @@ export function mountSmoke(el, ctx) {
       ctx.say(LINES.cig);
       if (st.cigs >= 20) ctx.unlock("smk_pack");
       if (st.cigs % 5 === 0) ctx.phil.smoke();
+      if (st.cigs % 25 === 0) ctx.log?.("smoke_milestone", { cigs: st.cigs });
     }
     checkAch();
     render();

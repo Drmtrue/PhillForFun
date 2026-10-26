@@ -12,7 +12,7 @@ The site is a single page with hash routes, so switching sections never reloads 
 
 | Route | Section |
 | --- | --- |
-| `#/` | Home: hero with the jersey and easter eggs, cards linking to every section with live teasers (quiz leader, current prices, achievements opened) |
+| `#/` | Home: hero with the jersey and easter eggs, and the live event feed (see below) |
 | `#/quiz` | Quiz: start form, leaderboard, fact submission, question and result screens (a game in progress survives switching sections) |
 | `#/rmt` | RMT exchange page (`rmt-page.js`): sticky in-page menu, overview cards, charts, order book, season timelines, savings goal with a farm-rate calculator, method notes |
 | `#/games` | Mini-games list: free-throw practice (inline), the side-court hoop, and links to the full-screen games below |
@@ -30,6 +30,23 @@ Each full-screen game is its own module with a `mount<Name>(el, ctx)` function. 
 Achievements: 3 for the clicker, 4 for the farm, 3 for the bath, plus 2 for free-throw practice streaks.
 
 To add another game, add a card and a `.game-view` to `index.html`, a module with `mount…(el, ctx)`, and register it in `GAMES` in `app.js`.
+
+## Event feed
+
+The home page shows a shared feed of what everyone did on the site, newest first, grouped by day, with filters (all / quiz / games / Phil / achievements), "show more" paging and a poll for new events every 25 s while the home page is open (`feed.js`).
+
+| Event | Logged by | Text |
+| --- | --- | --- |
+| `quiz_finish` | Worker, on `POST /scores` | finished the quiz with a score and verdict |
+| `quiz_quit` | page, `sendBeacon` on leaving mid-quiz (after at least one answer) | ran away on question N |
+| `fact_added` | Worker, on an accepted fact | told a fact; Root AI made N questions |
+| `ach` | Worker, on a live unlock (bulk syncs from a new device are not announced) | got an achievement / found an easter egg |
+| `basket` | Worker, on `POST /baskets`; repeats within 15 min merge into one row | scored N in the side hoop |
+| `phil_shot` | page | Phil made / missed his shot, with his line |
+| `phil_say` | page, selected lines only, at most once per 3 min per visitor and 6 per hour per IP | Phil's comment |
+| `ft_session`, `farm_end`, `bath_end`, `smoke_milestone` | page | mini-game results and milestones |
+
+`GET /events?limit=&before=&after=` returns events newest first; `POST /events { type, name, data }` accepts only the page-logged types above (flat data, short strings), 60 per hour per IP. The Worker keeps the latest 5 000 events.
 
 ## How it works
 
@@ -71,6 +88,8 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | Method | Path | Description |
 | --- | --- | --- |
 | `GET` | `/questions` | Player-generated questions |
+| `GET` | `/events` | Event feed, newest first (`limit`, `before`, `after`) |
+| `POST` | `/events` | Log a page-side event `{ type, name, data }` |
 | `GET` | `/scores` | Leaderboard: attempts, total points, average and achievement count per player, sorted by average |
 | `GET` | `/player?name=` | One player's attempts, points, average and side-court baskets |
 | `POST` | `/baskets` | Add side-court baskets `{ name, add }` (counted separately from quiz points) |

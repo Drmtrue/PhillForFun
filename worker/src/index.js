@@ -17,6 +17,21 @@ const json = (data, status = 200) =>
 
 const clean = (s, max) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
+// Event feed: types the browser may post (the rest are logged by the server itself)
+const CLIENT_EVENTS = new Set(["quiz_quit", "phil_shot", "phil_say", "ft_session", "farm_end", "bath_end", "smoke_milestone"]);
+// Small, flat event payloads only: numbers, booleans and short strings
+function cleanData(d) {
+  const out = {};
+  if (!d || typeof d !== "object") return out;
+  for (const [k, v] of Object.entries(d).slice(0, 10)) {
+    if (!/^[a-z_]{1,20}$/i.test(k)) continue;
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = Math.round(v * 100) / 100;
+    else if (typeof v === "boolean") out[k] = v;
+    else if (typeof v === "string") out[k] = clean(v, 160);
+  }
+  return out;
+}
+
 export default {
   // Hourly cron: keep the price cache and the daily history fresh even when nobody visits
   async scheduled(event, env, ctx) {
@@ -55,6 +70,7 @@ export default {
           return json({ error: "Слишком много попыток, передохни" }, 429);
         }
         await store.addScore(name, score, total);
+        await store.logEvent("quiz_finish", name, { score, total });
         return json({ ok: true });
       }
 
@@ -79,7 +95,9 @@ export default {
         if (!(await store.allow(ip, "basket", 400, 3600))) {
           return json({ error: "Слишком много бросков. Даже MJ отдыхал." }, 429);
         }
-        return json({ baskets: await store.addBaskets(name, add) });
+        const baskets = await store.addBaskets(name, add);
+        await store.logEvent("basket", name, { n: add }, { mergeMinutes: 15 });
+        return json({ baskets });
       }
 
       // Achievements (per player name)
@@ -99,7 +117,26 @@ export default {
         if (!(await store.allow(ip, "ach", 300, 3600))) {
           return json({ error: "Слишком много ачивок за час. Даже Фил так не фармит." }, 429);
         }
-        return json({ ids: await store.addAchievements(name, ids) });
+        // A live unlock posts one id; a bulk sync from a new device posts many and is not announced
+        return json({ ids: await store.addAchievements(name, ids, ids.length <= 2) });
+      }
+
+      // Event feed for the home page (newest first; pass ?before=<id> for older pages, ?after=<id> for new ones)
+      if (path === "/events" && request.method === "GET") {
+        const limit = Math.min(60, Math.max(1, Number(url.searchParams.get("limit")) || 40));
+        return json({ events: await store.listEvents(limit, Number(url.searchParams.get("before")) || 0, Number(url.searchParams.get("after")) || 0) });
+      }
+      if (path === "/events" && request.method === "POST") {
+        // Accepts text/plain too, so navigator.sendBeacon works without a CORS preflight
+        let body = {};
+        try { body = JSON.parse((await request.text()) || "{}"); } catch (_) { return json({ error: "Некорректное событие" }, 400); }
+        const type = String(body.type || "");
+        if (!CLIENT_EVENTS.has(type)) return json({ error: "Неизвестное событие" }, 400);
+        const name = clean(body.name, 30) || "Гость";
+        if (!(await store.allow(ip, "event", 60, 3600))) return json({ error: "Слишком много событий" }, 429);
+        if (type === "phil_say" && !(await store.allow(ip, "phil_say", 6, 3600))) return json({ ok: true, skipped: true });
+        await store.logEvent(type, name, cleanData(body.data));
+        return json({ ok: true });
       }
 
       // New fact -> questions
@@ -127,6 +164,7 @@ export default {
         }
         const factId = await store.logFact(fact, author, ip, "accepted", "");
         const saved = await store.addQuestions(factId, author, result.questions);
+        await store.logEvent("fact_added", author, { fact: fact.slice(0, 140), n: saved.length });
         return json({ accepted: true, questions: saved });
       }
 
@@ -252,6 +290,14 @@ export class QuizStore extends DurableObject {
           stock INTEGER NOT NULL DEFAULT 0
         )`,
       `CREATE INDEX IF NOT EXISTS price_ticks_idx ON price_ticks (game, league, ts)`,
+      `CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ts INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          data TEXT NOT NULL,
+          count INTEGER NOT NULL DEFAULT 1
+        )`,
       `CREATE TABLE IF NOT EXISTS league_seen (
           game TEXT NOT NULL,
           league TEXT NOT NULL,
@@ -488,18 +534,49 @@ export class QuizStore extends DurableObject {
     return this.sql.exec("SELECT count FROM baskets WHERE name_key = ?", k).one().count;
   }
 
+  // Feed. mergeMinutes: fold a repeat of the same type by the same player into their latest row
+  // (e.g. "забил 5 мячей" instead of five rows); the merged row moves to the top with a new id and time.
+  logEvent(type, name, data = {}, { mergeMinutes = 0 } = {}) {
+    const now = Date.now();
+    if (mergeMinutes) {
+      const mine = this.sql.exec("SELECT id, data, ts FROM events WHERE type = ? AND name = ? ORDER BY id DESC LIMIT 1", type, name).toArray()[0];
+      if (mine && now - mine.ts < mergeMinutes * 60000) {
+        // Re-post under a new id so open pages that poll for newer ids pick up the updated count
+        const d = JSON.parse(mine.data);
+        d.n = (d.n || 1) + (data.n || 1);
+        this.sql.exec("DELETE FROM events WHERE id = ?", mine.id);
+        this.sql.exec("INSERT INTO events (ts, type, name, data) VALUES (?, ?, ?, ?)", now, type, name, JSON.stringify(d));
+        return;
+      }
+    }
+    this.sql.exec("INSERT INTO events (ts, type, name, data) VALUES (?, ?, ?, ?)", now, type, name, JSON.stringify(data));
+    this.sql.exec("DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - 5000");
+  }
+
+  listEvents(limit, before, after) {
+    const rows = after
+      ? this.sql.exec("SELECT * FROM events WHERE id > ? ORDER BY id DESC LIMIT ?", after, limit).toArray()
+      : before
+        ? this.sql.exec("SELECT * FROM events WHERE id < ? ORDER BY id DESC LIMIT ?", before, limit).toArray()
+        : this.sql.exec("SELECT * FROM events ORDER BY id DESC LIMIT ?", limit).toArray();
+    return rows.map((r) => ({ id: r.id, ts: r.ts, type: r.type, name: r.name, data: JSON.parse(r.data) }));
+  }
+
   listAchievements(name) {
     return this.sql.exec("SELECT ach_id FROM achievements WHERE name_key = ? ORDER BY created_at", name.trim().toLowerCase())
       .toArray().map((r) => r.ach_id);
   }
 
-  addAchievements(name, ids) {
+  addAchievements(name, ids, announce = false) {
     const key = name.trim().toLowerCase();
     const have = this.sql.exec("SELECT COUNT(*) AS n FROM achievements WHERE name_key = ?", key).one().n;
     let room = Math.max(0, 100 - have);
     for (const id of ids) {
       if (room <= 0) break;
-      this.sql.exec("INSERT OR IGNORE INTO achievements (name_key, ach_id, created_at) VALUES (?, ?, ?)", key, id, Date.now());
+      const known = this.sql.exec("SELECT 1 FROM achievements WHERE name_key = ? AND ach_id = ?", key, id).toArray().length;
+      if (known) continue;
+      this.sql.exec("INSERT INTO achievements (name_key, ach_id, created_at) VALUES (?, ?, ?)", key, id, Date.now());
+      if (announce) this.logEvent("ach", name, { id });
       room--;
     }
     return this.listAchievements(name);
