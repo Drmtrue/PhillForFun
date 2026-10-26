@@ -47,6 +47,10 @@ Phil is levelled up by everyone together. Every event in the feed also grants XP
 
 Scenes play on matching moments (a facepalm on a wrong answer, the bath when the bath game starts, a Divine drop on a stack, a rage quit on a scam) and as an idle show every 40–90 s. When a browser sees a talent open since its last visit, a toast announces it and Phil performs it.
 
+## Debug mode
+
+Click the jersey 5 times, then right-click Phil twice, all within 10 seconds. A panel opens with every talent animation, the reactions, a smoke break, the sunglasses, a side-court shot with a chosen outcome, every line pool (built-in and talent) and sliders for the branch levels. While it is on, nothing reaches the server: `api()` drops every write, `logEvent()` and the quiz-quit beacon are off, achievements are not granted, and all talents are shown as unlocked. "Выход" restores the real progress. `?debug` in the URL exposes `window.__debug` for automated checks.
+
 ## Event feed
 
 The home page shows a shared feed of what everyone did on the site, newest first, grouped by day, with filters (all / quiz / games / Phil / achievements), "show more" paging and a poll for new events every 25 s while the home page is open (`feed.js`).
@@ -58,8 +62,8 @@ The home page shows a shared feed of what everyone did on the site, newest first
 | `fact_added` | Worker, on an accepted fact | told a fact; Root AI made N questions |
 | `ach` | Worker, on a live unlock (bulk syncs from a new device are not announced) | got an achievement / found an easter egg |
 | `basket` | Worker, on `POST /baskets`; repeats within 15 min merge into one row | scored N in the side hoop |
-| `phil_shot` | page | Phil made / missed his shot, with his line |
-| `phil_say` | page, selected lines only, at most once per 3 min per visitor and 6 per hour per IP | Phil's comment |
+| `phil_shot` | page; makes always, misses at most once per 30 min per visitor | Phil made / missed his shot, with his line |
+| `phil_say` | page, selected lines only, at most once per 10 min per visitor and 6 per hour per IP | Phil's comment |
 | `ft_session`, `farm_end`, `bath_end`, `smoke_milestone` | page | mini-game results and milestones |
 
 `GET /events?limit=&before=&after=` returns events newest first; `POST /events { type, name, data }` accepts only the page-logged types above (flat data, short strings), 60 per hour per IP. The Worker keeps the latest 5 000 events.

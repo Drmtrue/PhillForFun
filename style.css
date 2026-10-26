@@ -1113,3 +1113,30 @@ body.hoop-on .hoop-hud { display: block; }
 .talent-text small { color: var(--muted); font-size: 12px; }
 .talent-lvl { font-family: "Graduate", serif; font-size: 13px; color: var(--muted); }
 .branch-src { margin: 10px 0 0; }
+
+/* ---------- Debug panel ---------- */
+.dbg {
+  position: fixed; left: 12px; top: 72px; z-index: 70; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 90px);
+  display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--led); background: rgba(13, 11, 11, .96);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .6); font-size: 13px; -webkit-user-select: text; user-select: text;
+}
+.dbg-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.dbg-head b { font-size: 14px; }
+.dbg-state { flex: 1; color: var(--muted); font-size: 12px; }
+.dbg-head .btn { padding: 6px 12px; font-size: 12px; }
+.dbg-min { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
+.dbg.min .dbg-body { display: none; }
+.dbg-body { overflow: auto; padding: 8px 12px 12px; }
+.dbg h4 { margin: 12px 0 6px; font: 800 11px "Manrope", sans-serif; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.dbg-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.dbg-grid button, .dbg-row button {
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; font: 600 12px "Manrope", sans-serif;
+}
+.dbg-grid button:hover, .dbg-row button:hover { border-color: var(--led); }
+.dbg-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.dbg-row select { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: 600 12px "Manrope", sans-serif; }
+.dbg-lvl { display: grid; gap: 2px; margin: 6px 0; }
+.dbg-lvl span b { color: var(--led); font-family: "Graduate", serif; font-weight: 400; margin-left: 4px; }
+.dbg-lvl input { accent-color: var(--led); width: 100%; }
+.dbg-note { margin: 6px 0 0; }
+body.debug-on .phil-av::after { content: "DEBUG"; position: absolute; left: 50%; top: -14px; transform: translateX(-50%); font: 800 10px "Manrope", sans-serif; letter-spacing: .14em; color: var(--led); }

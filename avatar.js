@@ -1,4 +1,4 @@
-import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610251904";
+import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610251915";
 
 // Phil the mascot: a 3D cartoon Phil who walks along the bottom of the screen (phil3d.js), with a flat
 // anime-style SVG badge as the fallback. He reacts to game events with a speech bubble and now and
@@ -285,7 +285,7 @@ const SVG = `
 const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug", blame: "angry", pwned: "smug" };
 
 // onLine(key, text): called with every line Phil says (key is the LINES name or the pool id), e.g. for the event feed
-export function initAvatar({ onLine } = {}) {
+export function initAvatar({ onLine, onContext } = {}) {
   const root = document.createElement("div");
   root.className = "phil-av";
   root.dataset.mood = "neutral";
@@ -298,12 +298,12 @@ export function initAvatar({ onLine } = {}) {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251904")
+  import("./phil3d.js?v=202610251915")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, {
         bubble,
         onClick: () => say("click", { force: true }),
-        onContext: shootNow          // right click: go shoot right now, no waiting for the timer
+        onContext: () => { if (!(onContext && onContext() === false)) shootNow(); } // right click: go shoot now (a hook may swallow it)
       });
       root.classList.add("phil-3d");
     })
@@ -315,6 +315,7 @@ export function initAvatar({ onLine } = {}) {
       face.title = "Фил";
       face.innerHTML = SVG;
       face.addEventListener("click", () => say("click", { force: true }));
+      face.addEventListener("contextmenu", (e) => { e.preventDefault(); onContext && onContext(); });
       root.append(face);
     });
 
@@ -474,5 +475,10 @@ export function initAvatar({ onLine } = {}) {
     }, 2500 + Math.random() * 4000);
   })();
 
-  return { say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot, setProgress, playScene, get progress() { return progress; } };
+  return {
+    say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot, setProgress, playScene,
+    get progress() { return progress; },
+    get body() { return body3d; },
+    lines: LINES
+  };
 }
