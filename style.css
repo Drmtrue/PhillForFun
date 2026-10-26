@@ -1152,3 +1152,66 @@ body.pattern-stars .court { background-image: radial-gradient(1.5px 1.5px at 20%
 .preview-banner a { color: inherit; }
 .portal-404 { padding: 80px 0; text-align: center; }
 .phil-photo { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid var(--led); background: var(--card); font-size: 40px; }
+
+/* ---------- Platform: portal directory, account, builder ---------- */
+.nav-create { color: var(--led) !important; }
+.portals { margin: 6px 0 26px; }
+.portal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.portal-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; text-decoration: none; color: var(--text); background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--pc); transition: transform .15s; }
+.portal-card:hover { transform: translateY(-2px); border-color: var(--pc); }
+.portal-card b { font: 400 18px var(--head-font, "Anton"), sans-serif; text-transform: uppercase; }
+.portal-card span { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+
+.cr-form { display: grid; gap: 10px; margin: 10px 0; }
+.cr-form input, .cr-grid input:not([type=color]):not([type=checkbox]), .cr-grid select, .cr-body textarea, .cr-q input, .cr-ach input, .cr-talent input, .cr-talent select, .cr-key-restore input {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0d0b0b; color: var(--text); font: 600 14px "Manrope", sans-serif;
+}
+.cr-form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.cr-check { grid-template-columns: auto 1fr !important; align-items: start; color: var(--text) !important; }
+.cr-msg { min-height: 1.2em; font-weight: 700; font-size: 14px; }
+.cr-msg.bad { color: var(--red-2); } .cr-msg.good { color: var(--green); }
+.cr-key { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.cr-key code { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 8px 10px; border-radius: 8px; background: #0d0b0b; border: 1px solid var(--line); }
+.cr-list { margin: 6px 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.cr-list code { color: var(--led); }
+.cr-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-size: 14px; }
+.cr-steps { list-style: none; display: flex; gap: 6px; padding: 0; margin: 0 0 14px; overflow-x: auto; scrollbar-width: none; }
+.cr-steps button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font: 700 13px "Manrope", sans-serif; cursor: pointer; white-space: nowrap; }
+.cr-steps button span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #0d0b0b; font-size: 11px; }
+.cr-steps button.ok span { background: var(--green); color: #07100c; }
+.cr-steps button.active { color: var(--text); border-color: var(--led); }
+.cr-body .panel + .panel, .cr-body form.panel { margin-top: 14px; }
+.cr-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.cr-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.cr-thumbs img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+.cr-face { width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--led); object-fit: cover; }
+.cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; align-items: end; }
+.cr-grid label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.cr-grid input[type=color] { width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: #0d0b0b; padding: 3px; }
+.cr-grid .btn { grid-column: 1 / -1; }
+.cr-sec summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; list-style: none; }
+.cr-sec summary::-webkit-details-marker { display: none; }
+.cr-sec summary h2::after { content: " ▾"; color: var(--muted); }
+.cr-sec[open] summary { margin-bottom: 10px; }
+.cr-lines { display: grid; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.cr-ach { display: grid; grid-template-columns: 56px 1fr 2fr; gap: 6px; margin-bottom: 6px; }
+.cr-q { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 10px; margin: 0 0 8px; display: grid; gap: 6px; }
+.cr-q legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.cr-q input.ok { border-color: var(--green); }
+.cr-talent { display: grid; grid-template-columns: 1.2fr 1fr 56px 1.2fr 2fr; gap: 6px; margin: 8px 0; }
+@media (max-width: 640px) { .cr-talent { grid-template-columns: 1fr 1fr; } .cr-ach { grid-template-columns: 48px 1fr; } .cr-ach input:last-child { grid-column: 1 / -1; } }
+.cr-preview { background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--p-accent) 30%, transparent), transparent 70%), var(--p-bg) !important; border-top-color: var(--p-accent) !important; position: relative; }
+.cr-preview h1 { margin: 4px 0 8px; font-size: 40px; }
+.cr-preview h1 span { color: var(--p-accent); text-shadow: 3px 3px 0 var(--p-dark); }
+.cr-pv-kicker { margin: 0; color: var(--p-accent); font: 800 11px "Manrope", sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+.cr-pv-jersey { position: absolute; right: 16px; top: 16px; padding: 6px 10px; border-radius: 8px; background: var(--p-accent); color: #fff; font-weight: 800; }
+.cr-pv-jersey b { color: var(--p-hi); }
+.cr-check-list { list-style: none; padding: 0; display: grid; gap: 4px; }
+.cr-check-list li.ok { color: var(--green); }
+.cr-link { overflow-wrap: anywhere; }
+.cr-danger { margin-top: 18px; color: var(--muted); }
+.topnav a { padding: 8px 8px; font-size: 13.5px; gap: 5px; }
+.lead a, .page-head a { color: var(--led); }
+@media (max-width: 760px) and (min-width: 561px) { .topnav a b { display: none; } .topnav a span { font-size: 18px; } }
+@media (min-width: 761px) { .topnav a > span { display: none; } .topnav a { padding: 8px 6px; } }
+@media (max-width: 560px) { .topnav a { padding: 5px 1px; font-size: 9.5px; letter-spacing: -.01em; } .topnav a span { font-size: 17px; } }

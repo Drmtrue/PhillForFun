@@ -2,7 +2,7 @@
 // loadPortal() fetches the published config (or the owner's draft for a preview) before the app starts.
 // Phil's own content stays in the code; other portals override it from their config.
 
-import { API_URL } from "./config.js?v=202610260526";
+import { API_URL } from "./config.js?v=202610260531";
 
 const params = new URLSearchParams(location.search);
 export const SLUG = (params.get("p") || "phil").toLowerCase().replace(/[^a-z0-9-]/g, "") || "phil";

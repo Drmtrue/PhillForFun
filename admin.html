@@ -6,14 +6,15 @@
   <meta name="robots" content="noindex">
   <title>Админка квиза</title>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610260526">
+  <link rel="stylesheet" href="style.css?v=202610260531">
   <style>
     .item { border-top: 1px solid var(--line); padding: 14px 0; }
     .item:first-child { border-top: 0; }
     .item .q { font-weight: 700; margin: 0 0 6px; }
     .item .meta { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
     .item .btn { padding: 8px 14px; font-size: 14px; margin-top: 8px; }
-    .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+    .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; align-items: center; }
+    #portal-pick { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #0d0b0b; color: var(--text); font: 600 13px "Manrope", sans-serif; }
     .tabs .btn.on { border-color: var(--led); color: var(--led); }
     body { -webkit-user-select: text; user-select: text; }
 
@@ -59,6 +60,8 @@
       <div class="tabs">
         <button class="btn on" data-tab="questions">Вопросы</button>
         <button class="btn" data-tab="facts">Все факты</button>
+        <button class="btn" data-tab="platform">Платформа</button>
+        <select id="portal-pick" title="Чей квиз модерировать"><option value="phil">Портал: Фил</option></select>
         <button class="btn" id="logout">Выйти</button>
       </div>
       <div class="panel"><div id="list"></div></div>
@@ -67,15 +70,18 @@
   </main>
 
   <script type="module">
-    import { API_URL } from "./config.js?v=202610260526";
+    import { API_URL } from "./config.js?v=202610260531";
     const API = API_URL.replace(/\/+$/, "");
     const $ = (id) => document.getElementById(id);
     let token = "";
     try { token = localStorage.getItem("phill_admin") || ""; } catch (_) {}
     let tab = "questions";
+    let portal = "phil"; // whose questions and facts the moderation tabs show
+    const ACCOUNT_KEY = "phill_account_key";
 
     async function api(path, opts = {}) {
-      const res = await fetch(API + path, { ...opts, headers: { Authorization: "Bearer " + token, ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
+      const scoped = portal !== "phil" && /^\/admin\/(questions|facts)/.test(path);
+      const res = await fetch(API + path + (scoped ? (path.includes("?") ? "&" : "?") + "portal=" + portal : ""), { ...opts, headers: { Authorization: "Bearer " + token, ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Ошибка");
       return data;
@@ -174,7 +180,9 @@
       list.innerHTML = "";
       $("status").textContent = "Загрузка…";
       try {
-        if (tab === "questions") {
+        if (tab === "platform") {
+          await renderPlatform(list);
+        } else if (tab === "questions") {
           const { questions } = await api("/admin/questions");
           if (!questions.length) list.append(el("p", "muted", "Пока нет вопросов от игроков."));
           for (const q of questions) {
@@ -215,6 +223,60 @@
       }
     }
 
+    // ---- Platform: the admin's own account (unlimited portals and invites) and all portals
+    async function renderPlatform(list) {
+      const acc = el("div", "item");
+      let has = "";
+      try { has = localStorage.getItem(ACCOUNT_KEY) || ""; } catch (_) {}
+      acc.append(el("p", "q", "Аккаунт админа на платформе"));
+      acc.append(el("p", "meta", has
+        ? "В этом браузере уже есть ключ аккаунта. Новый аккаунт его заменит."
+        : "Создай аккаунт админа: без лимита порталов и приглашений. Ключ сохранится в этом браузере и будет работать на сайте."));
+      const name = el("input");
+      name.placeholder = "Твоё имя";
+      name.value = "Robert";
+      const mk = el("button", "btn primary", "Создать аккаунт админа");
+      const out = el("p", "meta");
+      mk.onclick = async () => {
+        if (has && !confirm("Заменить ключ аккаунта в этом браузере?")) return;
+        mk.disabled = true;
+        try {
+          const r = await api("/admin/platform/account", { method: "POST", body: JSON.stringify({ name: name.value.trim() || "Админ" }) });
+          try { localStorage.setItem(ACCOUNT_KEY, r.key); } catch (_) {}
+          out.textContent = `Готово. Ключ: ${r.key} — сохранён в этом браузере. Скопируй его в надёжное место. Дальше: сайт → «Свой портал» и «Мой аккаунт» (приглашения).`;
+        } catch (e) { out.textContent = e.message; }
+        mk.disabled = false;
+      };
+      acc.append(name, mk, out);
+      list.append(acc);
+
+      const { portals } = await api("/admin/platform/portals");
+      list.append(el("p", "q", `Порталы (${portals.length})`));
+      for (const p of portals) {
+        const item = el("div", "item");
+        const a = el("a", null, `${p.title} (${p.slug})`);
+        a.href = `./?p=${encodeURIComponent(p.slug)}`;
+        a.target = "_blank";
+        item.append(a, el("p", "meta", p.status === "published" ? `опубликован ${p.publishedAt ? when(p.publishedAt) : ""}` : "черновик"));
+        const del = el("button", "btn", "Удалить портал");
+        del.onclick = async () => {
+          if (!confirm(`Удалить портал «${p.title}» навсегда?`)) return;
+          await api(`/admin/platform/portals/${p.slug}`, { method: "DELETE" });
+          item.remove();
+        };
+        item.append(del);
+        list.append(item);
+      }
+      $("status").textContent = "";
+      fillPortalPick(portals);
+    }
+    function fillPortalPick(portals) {
+      const sel = $("portal-pick");
+      sel.innerHTML = '<option value="phil">Портал: Фил</option>' + portals.filter((p) => p.status === "published").map((p) => `<option value="${p.slug}">Портал: ${p.title.replace(/[<>&"]/g, "")}</option>`).join("");
+      sel.value = portal;
+    }
+    $("portal-pick").onchange = (e) => { portal = e.target.value; if (tab !== "platform") render(); };
+
     $("login").onsubmit = (e) => {
       e.preventDefault();
       token = $("token").value.trim();
@@ -235,7 +297,10 @@
     });
 
     if (!API) $("status").textContent = "Сервер ещё не подключён (API_URL в config.js пустой).";
-    else if (token) render();
+    else if (token) {
+      render();
+      api("/admin/platform/portals").then((r) => fillPortalPick(r.portals)).catch(() => {});
+    }
   </script>
 </body>
 </html>
