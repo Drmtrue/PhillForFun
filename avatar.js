@@ -285,7 +285,7 @@ const SVG = `
 const ACTS = { start: "wave", click: ["wave", "happy", "smug", "shock"], faceOn: "shock", faceOff: "smug", blame: "angry", pwned: "smug" };
 
 // onLine(key, text): called with every line Phil says (key is the LINES name or the pool id), e.g. for the event feed
-export function initAvatar({ onLine } = {}) {
+export function initAvatar({ onLine, onContext } = {}) {
   const root = document.createElement("div");
   root.className = "phil-av";
   root.dataset.mood = "neutral";
@@ -303,7 +303,7 @@ export function initAvatar({ onLine } = {}) {
       body3d = createPhil3D(root, {
         bubble,
         onClick: () => say("click", { force: true }),
-        onContext: shootNow          // right click: go shoot right now, no waiting for the timer
+        onContext: () => { if (!(onContext && onContext() === false)) shootNow(); } // right click: go shoot now (a hook may swallow it)
       });
       root.classList.add("phil-3d");
     })
@@ -315,6 +315,7 @@ export function initAvatar({ onLine } = {}) {
       face.title = "Фил";
       face.innerHTML = SVG;
       face.addEventListener("click", () => say("click", { force: true }));
+      face.addEventListener("contextmenu", (e) => { e.preventDefault(); onContext && onContext(); });
       root.append(face);
     });
 
@@ -474,5 +475,10 @@ export function initAvatar({ onLine } = {}) {
     }, 2500 + Math.random() * 4000);
   })();
 
-  return { say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot, setProgress, playScene, get progress() { return progress; } };
+  return {
+    say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot, setProgress, playScene,
+    get progress() { return progress; },
+    get body() { return body3d; },
+    lines: LINES
+  };
 }

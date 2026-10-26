@@ -940,6 +940,8 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   requestAnimationFrame(frame);
   return {
     react, smoke, shoot, play,
+    scenes: Object.keys(SCENES),
+    stop: endScene,
     get scene() { return st.scene; },
     glasses(on) { if (!(on && st.task)) st.shadesOn = on; },
     get busy() { return !!st.task || st.smokeT >= 0 || !!st.react || !!st.scene; },

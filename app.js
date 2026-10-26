@@ -8,10 +8,11 @@ import { mountFarm } from "./game-farm.js?v=202610251904";
 import { mountBath } from "./game-bath.js?v=202610251904";
 import { renderTree } from "./tree.js?v=202610251904";
 import { TALENTS } from "./talents.js?v=202610251904";
+import { initDebug } from "./debug.js?v=202610251904";
 import { initFeed } from "./feed.js?v=202610251904";
 import { initAvatar } from "./avatar.js?v=202610251904";
 
-const phil = initAvatar({ onLine: philLine }); // Phil the mascot: comments on what happens
+const phil = initAvatar({ onLine: philLine, onContext: () => debugCombo.rightClick() }); // Phil the mascot
 
 const $ = (id) => document.getElementById(id);
 const NAME_COOKIE = "phill_quiz_name";
@@ -41,7 +42,9 @@ const nameKey = (name) => (name || "").trim().toLowerCase();
 /* ---------- Server (Cloudflare) or local mode ---------- */
 const API = API_URL.replace(/\/+$/, "");
 
+let debugOn = false; // debug mode: nothing is written to the server (see debug.js)
 async function api(path, opts = {}) {
+  if (debugOn && opts.method && opts.method !== "GET") return {}; // swallow every write in debug mode
   const res = await fetch(API + path, {
     ...opts,
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) }
@@ -184,6 +187,7 @@ async function syncAch(name) {
 function unlock(id) {
   const a = ACH_BY_ID[id];
   if (!a || unlocked.has(id)) return;
+  if (debugOn) { toast(`🛠️ (дебаг) ачивка не выдана: ${a.title}`, "В дебаг-режиме ачивки не сохраняются."); return; }
   unlocked.add(id);
   saveLocalAch();
   toast(`${a.icon} Ачивка: ${a.title}`, a.desc);
@@ -1148,6 +1152,7 @@ async function loadProgress() {
   try {
     const p = await api("/phil");
     philXp = p.xp || {};
+    if (debugOn) return;
     phil.setProgress(philXp);
     renderTree($("phil-tree"), phil.progress, philXp, p.players || 0);
     // Announce talents that opened since this browser last looked (not the very first load)
@@ -1177,7 +1182,7 @@ if (!API) $("feed").hidden = true;
 
 // Post an event the server cannot see by itself (game results, Phil's shots and lines)
 function logEvent(type, data = {}) {
-  if (!API) return;
+  if (!API || debugOn) return;
   const body = JSON.stringify({ type, name: getName() || "Гость", data });
   fetch(`${API}/events`, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
     .then(() => {
@@ -1204,12 +1209,36 @@ function philLine(key, text, ev) {
 
 // Leaving the site in the middle of a quiz counts as running away from it
 window.addEventListener("pagehide", () => {
-  if (!API || !game || game.done) return;
+  if (!API || debugOn || !game || game.done) return;
   const answered = game.questions.filter((q) => q.tries).length;
   if (!answered) return;
   const body = JSON.stringify({ type: "quiz_quit", name: game.name, data: { at: game.i + 1, total: game.questions.length, score: game.score } });
   navigator.sendBeacon?.(`${API}/events`, new Blob([body], { type: "text/plain" }));
 });
+
+/* ---------- Debug mode: 5 clicks on the jersey, then 2 right-clicks on Phil, within 10 s ---------- */
+const debug = initDebug({
+  phil, hoop: hoopGame, sfx, toast,
+  onEnter: () => { debugOn = true; },
+  onExit: () => { debugOn = false; loadProgress(); }
+});
+const debugCombo = (() => {
+  let jersey = 0, rights = 0, timer = null;
+  const reset = () => { jersey = 0; rights = 0; };
+  const arm = () => { clearTimeout(timer); timer = setTimeout(reset, 10000); };
+  $("jersey").addEventListener("click", () => { rights = 0; jersey++; arm(); }); // the 23<->45 flip egg keeps working alongside
+  return {
+    rightClick() {
+      if (debug.on) return true;
+      if (jersey < 5) return true;
+      rights++;
+      arm();
+      if (rights >= 2) { reset(); debug.enter(); return false; }
+      return false; // the first right click is swallowed too, so Phil does not run off mid-combo
+    }
+  };
+})();
+if (new URLSearchParams(location.search).has("debug")) window.__debug = debug;
 
 /* ---------- Startup ---------- */
 loadProgress();
