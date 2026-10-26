@@ -19,6 +19,25 @@ const clean = (s, max) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, m
 
 // Event feed: types the browser may post (the rest are logged by the server itself)
 const CLIENT_EVENTS = new Set(["quiz_quit", "phil_shot", "phil_say", "ft_session", "farm_end", "bath_end", "smoke_milestone"]);
+// Phil's progression: every event feeds XP into one of four talent branches, shared by all players
+const BRANCHES = ["hoops", "farm", "chill", "mind"];
+function xpFor(type, d = {}) {
+  switch (type) {
+    case "quiz_finish": return { mind: 20 + (d.score || 0) * 4 + (d.score === d.total ? 40 : 0) };
+    case "quiz_quit": return { mind: 5 };
+    case "fact_added": return { mind: 35 };
+    case "ach": return { mind: 25 };
+    case "basket": return { hoops: 8 * (d.n || 1) };
+    case "ft_session": return { hoops: 4 * (d.shots || 0) + 6 * (d.made || 0) + 10 * (d.best || 0) };
+    case "phil_shot": return { hoops: d.made ? 120 : 10 };
+    case "phil_say": return { chill: 3 };
+    case "farm_end": return { farm: 15 + Math.min(150, Math.round((d.rub || 0) / 10)) + (d.scammed ? 10 : 0) };
+    case "bath_end": return { chill: 10 + Math.min(120, Math.round((d.sec || 0) / 2)) };
+    case "smoke_milestone": return { chill: d.upgrade ? 60 : 30 };
+    default: return {};
+  }
+}
+
 // Small, flat event payloads only: numbers, booleans and short strings
 function cleanData(d) {
   const out = {};
@@ -137,6 +156,11 @@ export default {
         if (type === "phil_say" && !(await store.allow(ip, "phil_say", 6, 3600))) return json({ ok: true, skipped: true });
         await store.logEvent(type, name, cleanData(body.data));
         return json({ ok: true });
+      }
+
+      // Phil's progression: XP per talent branch (shared by everyone)
+      if (path === "/phil" && request.method === "GET") {
+        return json(await store.philProgress());
       }
 
       // New fact -> questions
@@ -297,6 +321,11 @@ export class QuizStore extends DurableObject {
           name TEXT NOT NULL,
           data TEXT NOT NULL,
           count INTEGER NOT NULL DEFAULT 1
+        )`,
+      `CREATE TABLE IF NOT EXISTS phil_xp (
+          branch TEXT PRIMARY KEY,
+          xp INTEGER NOT NULL DEFAULT 0,
+          events INTEGER NOT NULL DEFAULT 0
         )`,
       `CREATE TABLE IF NOT EXISTS league_seen (
           game TEXT NOT NULL,
@@ -538,6 +567,7 @@ export class QuizStore extends DurableObject {
   // (e.g. "забил 5 мячей" instead of five rows); the merged row moves to the top with a new id and time.
   logEvent(type, name, data = {}, { mergeMinutes = 0 } = {}) {
     const now = Date.now();
+    this.addXp(xpFor(type, data));
     if (mergeMinutes) {
       const mine = this.sql.exec("SELECT id, data, ts FROM events WHERE type = ? AND name = ? ORDER BY id DESC LIMIT 1", type, name).toArray()[0];
       if (mine && now - mine.ts < mergeMinutes * 60000) {
@@ -551,6 +581,26 @@ export class QuizStore extends DurableObject {
     }
     this.sql.exec("INSERT INTO events (ts, type, name, data) VALUES (?, ?, ?, ?)", now, type, name, JSON.stringify(data));
     this.sql.exec("DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - 5000");
+  }
+
+  addXp(gains) {
+    for (const [branch, xp] of Object.entries(gains)) {
+      if (!BRANCHES.includes(branch) || !(xp > 0)) continue;
+      this.sql.exec(
+        `INSERT INTO phil_xp (branch, xp, events) VALUES (?, ?, 1)
+         ON CONFLICT(branch) DO UPDATE SET xp = xp + excluded.xp, events = events + 1`,
+        branch, Math.round(xp)
+      );
+    }
+  }
+
+  philProgress() {
+    const rows = this.sql.exec("SELECT branch, xp, events FROM phil_xp").toArray();
+    const xp = Object.fromEntries(BRANCHES.map((b) => [b, 0]));
+    const events = Object.fromEntries(BRANCHES.map((b) => [b, 0]));
+    for (const r of rows) { xp[r.branch] = r.xp; events[r.branch] = r.events; }
+    const players = this.sql.exec("SELECT COUNT(DISTINCT name) AS n FROM events").one().n;
+    return { xp, events, players };
   }
 
   listEvents(limit, before, after) {

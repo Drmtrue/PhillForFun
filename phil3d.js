@@ -193,21 +193,90 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   add(new THREE.BoxGeometry(0.16, 0.035, 0.035), lensMat, shades, [0, 0.05, 0.06]);
   shades.visible = false;
 
+  // ----- Scene props (hidden until a talent animation needs them)
+  const props = new THREE.Group();
+  scene.add(props);
+  const prop = (g) => { g.visible = false; props.add(g); return g; };
+
+  // Bath tub with water and steam
+  const bath = prop(new THREE.Group());
+  const tubMat = std(0xf2f2f4, { roughness: 0.3 });
+  add(new THREE.CylinderGeometry(1.25, 1.0, 0.9, 32, 1, true), tubMat, bath, [0, 0.45, 0], [1, 1, 0.6]);
+  add(new THREE.TorusGeometry(1.25, 0.08, 10, 40), tubMat, bath, [0, 0.9, 0], [1, 0.6, 1], [Math.PI / 2, 0, 0]);
+  add(new THREE.CylinderGeometry(1.0, 1.0, 0.06, 32), tubMat, bath, [0, 0.03, 0], [1, 1, 0.6]);
+  const water = add(new THREE.CylinderGeometry(1.18, 1.18, 0.04, 32), std(0x4fa0e0, { roughness: 0.1, transparent: true, opacity: 0.85 }), bath, [0, 0.8, 0], [1, 1, 0.6]);
+  for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.07, 0.05, 0.3, 8), std(0xb9b9c2), bath, [s * 0.9, -0.1, 0.35]);
+  for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.07, 0.05, 0.3, 8), std(0xb9b9c2), bath, [s * 0.9, -0.1, -0.35]);
+  const duck = add(sphere(0.16, 16, 12), std(0xffd23f, { roughness: 0.5 }), bath, [0.6, 0.9, 0.2]);
+  add(sphere(0.1, 12, 10), std(0xffd23f), duck, [0.08, 0.13, 0]);
+  add(new THREE.ConeGeometry(0.04, 0.09, 8), std(0xff7a1a), duck, [0.19, 0.12, 0], null, [0, 0, -Math.PI / 2]);
+  duck.visible = false;
+
+  // Desk with a PC and a glowing monitor
+  const desk = prop(new THREE.Group());
+  // Low desk in front of him; the monitor stands to his right so his face stays in view
+  add(new THREE.BoxGeometry(1.9, 0.07, 0.7), std(0x5a3b26, { roughness: 0.8 }), desk, [0.2, 0.72, 0]);
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.07, 0.72, 0.07), std(0x3b2619), desk, [0.2 + s * 0.85, 0.36, 0.2]);
+  add(new THREE.BoxGeometry(0.8, 0.52, 0.05), std(0x151518, { roughness: 0.3 }), desk, [0.75, 1.08, -0.05], null, [0, -0.5, 0]);
+  const screen = add(new THREE.PlaneGeometry(0.72, 0.44), basic(0x2a6fb3), desk, [0.737, 1.08, -0.02], null, [0, -0.5, 0]);
+  add(new THREE.BoxGeometry(0.08, 0.1, 0.08), std(0x151518), desk, [0.75, 0.78, -0.05]);
+  add(new THREE.BoxGeometry(0.6, 0.035, 0.22), std(0x222228, { roughness: 0.5 }), desk, [0.1, 0.77, 0.15]);
+  const keyboard = desk.children[desk.children.length - 1];
+  add(new THREE.BoxGeometry(0.3, 0.7, 0.7), std(0x111114, { roughness: 0.4 }), desk, [1.3, 0.35, 0.1]);
+  const pcLight = add(new THREE.PlaneGeometry(0.16, 0.55), basic(0xff2a55), desk, [1.145, 0.35, 0.1], null, [0, -Math.PI / 2, 0]);
+
+  // Divine Orb (a glowing golden sphere) and the Mirror
+  const orb = prop(new THREE.Group());
+  add(sphere(0.22, 24, 18), std(0xffd36b, { emissive: 0xffa020, emissiveIntensity: 0.9, roughness: 0.2 }), orb);
+  add(new THREE.TorusGeometry(0.3, 0.025, 8, 30), std(0xfff1b0, { emissive: 0xffc040, emissiveIntensity: 0.7 }), orb, [0, 0, 0], null, [Math.PI / 2.4, 0, 0]);
+  const mirror = prop(new THREE.Group());
+  add(new THREE.CylinderGeometry(0.38, 0.38, 0.05, 32), std(0xd0d8e8, { metalness: 0.9, roughness: 0.1 }), mirror, [0, 0, 0], null, [Math.PI / 2, 0, 0]);
+  add(new THREE.TorusGeometry(0.38, 0.05, 10, 40), std(0xf0c45c, { metalness: 0.8, roughness: 0.25 }), mirror);
+
+  // Scheme board ("где я в этой схеме")
+  const board = prop(new THREE.Group());
+  add(new THREE.PlaneGeometry(0.9, 0.65), basic(0xffffff, { map: schemeTexture() }), board);
+  // Adjika jar with a spoon
+  const jar = prop(new THREE.Group());
+  add(new THREE.CylinderGeometry(0.14, 0.14, 0.3, 16), std(0xc8102e, { roughness: 0.4 }), jar);
+  add(new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16), std(0xc9a37a), jar, [0, 0.17, 0]);
+  const spoon = prop(new THREE.Group());
+  add(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8), std(0xcfd3da, { metalness: 0.8, roughness: 0.3 }), spoon, [0, 0.15, 0]);
+  add(sphere(0.06, 12, 8), std(0xcfd3da, { metalness: 0.8, roughness: 0.3 }), spoon, [0, 0.32, 0], [1, 0.5, 1.3]);
+  // Pillow for the nap
+  const pillow = prop(add(new THREE.BoxGeometry(0.8, 0.22, 0.5), std(0xf4e9d8, { roughness: 0.9 }), new THREE.Group()).parent);
+  // Portable hoop for dunks
+  const hoopProp = prop(new THREE.Group());
+  add(new THREE.BoxGeometry(0.1, 2.3, 0.1), std(0x9a9a9a), hoopProp, [0, 1.15, -0.5]);
+  const backboard = add(new THREE.BoxGeometry(1.3, 0.8, 0.05), std(0xe8f4ff, { roughness: 0.05, transparent: true, opacity: 0.55 }), hoopProp, [0, 2.6, -0.45]);
+  add(new THREE.TorusGeometry(0.33, 0.035, 10, 32), std(0xff6a1f, { roughness: 0.4 }), hoopProp, [0, 2.3, -0.1], null, [Math.PI / 2, 0, 0]);
+  const glass = [];
+  for (let i = 0; i < 26; i++) {
+    const sh = add(new THREE.PlaneGeometry(0.12 + Math.random() * 0.14, 0.1 + Math.random() * 0.14), std(0xe8f4ff, { roughness: 0.05, transparent: true, opacity: 0.8, side: THREE.DoubleSide }), hoopProp);
+    sh.visible = false;
+    glass.push(sh);
+  }
+  const dribbleBall = prop(add(sphere(0.31, 32, 24), std(0xffffff, { roughness: 0.6, map: ballTexture() }), new THREE.Group()).parent);
+
   // ----- State
   const st = {
     x: 0, target: 0, pause: 1.5, dir: 1, phase: 0, facing: 0, t: 0,
     react: null, reactT: 0, smokeT: -1, nextPuff: 0, blinkAt: 2, blinkT: -1,
-    look: 0, mouseX: null, task: null, shades: 0, shadesOn: false
+    look: 0, mouseX: null, task: null, shades: 0, shadesOn: false,
+    scene: null, sceneT: 0              // talent animation in progress
   };
   const J = { // smoothed joint values
     armRX: [0, 0], armRZ: [-0.15, 0.15], legX: [0, 0], headX: 0, headY: 0, headZ: 0,
     hipsY: 0.78, jump: 0, eye: 1, back: 0, lean: 0
   };
 
+  let stage = false;        // bigger canvas while a talent animation plays
   function layout() {
     const k = small() ? 0.72 : 1;
-    W = Math.round(180 * k);
-    H = Math.round(230 * k);
+    W = Math.round((stage ? 430 : 180) * k);
+    H = Math.round((stage ? 330 : 230) * k);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
     root.style.width = W + "px";
     root.style.height = H + "px";
     renderer.setSize(W, H, false);
@@ -216,6 +285,9 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
     const [a, b] = range();
     st.x = Math.min(Math.max(st.x || b, a), b);
     st.target = st.x;
+    // The hit area and the bubble anchor follow the character, not the canvas
+    hit.style.left = stage ? `${(W - 180 * k) / 2 / W * 100 + 28 * 180 * k / W}%` : "28%";
+    hit.style.width = stage ? `${44 * 180 * k / W}%` : "44%";
   }
   // Where he may walk: the whole width on desktop, a short stretch by the right edge on phones
   function range() {
@@ -258,6 +330,46 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
   }
   const clampX = (x) => { const [a, b] = range(); return Math.min(b, Math.max(a, x)); };
 
+  // Talent animations ("scenes"). Each runs for SCENES[name].len seconds, blocks wandering and reactions,
+  // and may show props. play() returns false when Phil is busy.
+  const SCENES = {
+    dribble: { len: 5 }, spin: { len: 5 }, dunk: { len: 5.2 }, glassdunk: { len: 6.5 },
+    loot: { len: 3 }, divine: { len: 4.5 }, dota: { len: 9 }, rage: { len: 4 }, mirror: { len: 6 },
+    stretch: { len: 3.2 }, bath: { len: 11 }, bathduck: { len: 11 }, rings: { len: 7 }, nap: { len: 8 }, levitate: { len: 9 },
+    think: { len: 3 }, facepalm: { len: 2.6 }, scheme: { len: 6 }, adjika: { len: 7 }
+  };
+  function play(name) {
+    if (!SCENES[name] || st.scene || st.task || st.smokeT >= 0) return false;
+    st.scene = name;
+    stage = true;
+    const before = W;
+    layout();
+    st.x -= (W - before) / 2;   // grow around the character so he does not jump sideways
+    st.target = st.x;
+    st.sceneT = 0;
+    st.react = null;
+    st.shadesOn = false;
+    for (const g of glass) g.visible = false;
+    backboard.visible = true;
+    backboard.material.opacity = 0.55;
+    return true;
+  }
+  function endScene() {
+    st.scene = null;
+    stage = false;
+    const before = W;
+    layout();
+    st.x += (before - W) / 2;
+    st.target = Math.min(Math.max(st.x, range()[0]), range()[1]);
+    st.x = st.target;
+    for (const p of props.children) p.visible = false;
+    duck.visible = false;
+    cig.visible = false;
+    dribbleBall.visible = false;
+  }
+  // Props sit on the floor in front of / beside Phil in scene space (phil is at x=0)
+  const FLOOR_Y = -0.06;
+
   const lerp = (a, b, k) => a + (b - a) * k;
   const clamp01 = (x) => Math.max(0, Math.min(1, x));
   const ease = (x) => { x = clamp01(x); return x * x * (3 - 2 * x); };
@@ -272,6 +384,7 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
 
     // Reaction timer
     if (st.react) { st.reactT += dt; if (st.reactT > REACT_LEN[st.react]) st.react = null; }
+    if (st.scene) { st.sceneT += dt; if (st.sceneT > SCENES[st.scene].len) endScene(); }
     const smoking = st.smokeT >= 0;
     if (smoking) st.smokeT += dt;
     const lighting = smoking && st.smokeT < 2.6;
@@ -297,7 +410,7 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
         st.x += st.dir * Math.min(Math.abs(dx), SPEED * 1.5 * dt);
       }
       st.target = st.x;
-    } else if (!reduced && !st.react && !smoking && !st.task) { // a smoke break is a break: he stands still
+    } else if (!reduced && !st.react && !smoking && !st.task && !st.scene) { // a smoke break is a break: he stands still
       const dx = st.target - st.x;
       if (Math.abs(dx) < 2) {
         st.pause -= dt;
@@ -380,6 +493,275 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
         T.armRZ = [-2.75 + Math.sin(r * 12) * 0.35, 0.18];
         T.headZ = -0.08;
         break;
+    }
+
+    let hideBody = false, phX = 0, phZ = 0, phRotX = 0, phRotZ = 0;
+    if (st.scene) {
+      const u = st.sceneT, L = SCENES[st.scene].len;
+      const bounce = (p) => Math.max(0, Math.sin(p * Math.PI));
+      face = 0;
+      switch (st.scene) {
+        case "dribble": {
+          dribbleBall.visible = true;
+          const ph = (u * 3.2) % 1;
+          dribbleBall.position.set(0.55, FLOOR_Y + 0.31 + Math.abs(Math.sin(ph * Math.PI)) * 0.9, 0.55);
+          dribbleBall.rotation.z -= dt * 6;
+          T.armRX[1] = -0.9 + Math.sin(ph * Math.PI * 2) * 0.35;
+          T.armRZ[1] = -0.35;
+          T.lean = 0.12;
+          T.headX = 0.25;
+          mood = "smug";
+          if (ph < 0.05 && !st.lastBounceAt) st.lastBounceAt = 1;
+          if (ph > 0.5) st.lastBounceAt = 0;
+          break;
+        }
+        case "spin": {
+          dribbleBall.visible = true;
+          const up = ease(u / 0.6);
+          dribbleBall.position.set(0.55 * (1 - up), FLOOR_Y + 0.31 + up * 2.75, 0.5 + up * 0.1);
+          dribbleBall.rotation.y += dt * 11;
+          dribbleBall.rotation.x = 0.3;
+          T.armRX[1] = -2.6 * up;
+          T.armRZ[1] = 0.05;
+          T.headX = -0.3 * up;
+          T.headY = 0.3;
+          mood = "smug";
+          break;
+        }
+        case "dunk":
+        case "glassdunk": {
+          hoopProp.visible = true;
+          hoopProp.position.set(1.55, FLOOR_Y, -0.1);
+          dribbleBall.visible = u < 3.1;
+          const glassMode = st.scene === "glassdunk";
+          // 0-1.2 crouch and dribble, 1.2-2.4 run, 2.4-3.2 jump + slam, then land
+          if (u < 1.2) {
+            const ph = (u * 2.5) % 1;
+            dribbleBall.position.set(0.5, FLOOR_Y + 0.31 + Math.abs(Math.sin(ph * Math.PI)) * 0.7, 0.5);
+            T.armRX[1] = -0.8; T.armRZ[1] = -0.35; T.hipsY -= 0.08; T.lean = 0.2;
+            mood = "smug";
+          } else if (u < 2.4) {
+            const k = (u - 1.2) / 1.2;
+            phX = k * 0.95;
+            st.phase += dt * 12;
+            const sgn = Math.sin(st.phase);
+            T.legX = [sgn * 0.8, -sgn * 0.8];
+            T.armRX = [-1.3, -1.3]; T.armRZ = [0.4, -0.4];
+            dribbleBall.position.set(phX + 0.05, FLOOR_Y + 1.25, 0.6);
+            T.lean = 0.2;
+            face = 0.9;
+            mood = "shock";
+          } else if (u < 3.2) {
+            const k = (u - 2.4) / 0.8;
+            phX = 0.95 + k * 0.4;
+            T.jump = bounce(k * 0.9 + 0.05) * (glassMode ? 1.5 : 1.3);
+            T.armRX = [-2.9, -2.9]; T.armRZ = [0.25, -0.25];
+            T.legX = [0.5, -0.4];
+            T.headX = -0.3;
+            dribbleBall.position.set(phX + 0.15, FLOOR_Y + T.jump + 2.45, 0.1);
+            face = 0.9;
+            mood = "shock";
+            if (k > 0.75 && !st.slammed) {
+              st.slammed = true;
+              if (glassMode) {
+                backboard.visible = false;
+                glass.forEach((g, i) => {
+                  g.visible = true;
+                  g.position.set((Math.random() - 0.5) * 1.1, 2.6 + (Math.random() - 0.5) * 0.7, -0.45);
+                  g.userData.v = { x: (Math.random() - 0.5) * 2.5, y: Math.random() * 2, z: 1 + Math.random() * 2, r: (Math.random() - 0.5) * 12 };
+                });
+              }
+            }
+          } else {
+            const k = u - 3.2;
+            phX = 1.35;
+            T.jump = Math.max(0, 0.9 - k * 2.2);
+            T.armRZ = [-2.4, 2.4]; T.armRX = [0, 0];
+            mood = "happy";
+            st.slammed = false;
+            if (glassMode) for (const g of glass) if (g.visible) {
+              const v = g.userData.v;
+              g.position.x += v.x * dt; g.position.y += v.y * dt; g.position.z += v.z * dt;
+              v.y -= 9 * dt;
+              g.rotation.x += v.r * dt; g.rotation.y += v.r * 0.7 * dt;
+              if (g.position.y < FLOOR_Y + 0.05) { g.position.y = FLOOR_Y + 0.05; v.y = 0; v.x *= 0.9; v.z *= 0.9; }
+            }
+          }
+          if (u > 3.1) dribbleBall.visible = false;
+          break;
+        }
+        case "loot": {
+          T.jump = bounce((u * 1.6) % 1) * 0.3;
+          T.armRZ = [-2.3, 2.3];
+          mood = "happy";
+          break;
+        }
+        case "divine":
+        case "mirror": {
+          const it = st.scene === "divine" ? orb : mirror;
+          it.visible = true;
+          const drop = ease(u / 1.2);
+          it.position.set(0.1, FLOOR_Y + 4.5 - drop * 1.9, 0.9);
+          it.rotation.y += dt * 2;
+          it.rotation.x = st.scene === "mirror" ? 0.3 : 0;
+          if (u < 1.4) { T.headX = -0.5; mood = "shock"; T.eye = 1.3; }
+          else { T.armRX = [-2.2, -2.2]; T.armRZ = [0.5, -0.5]; it.position.y = FLOOR_Y + 2.5 + Math.sin(t * 3) * 0.05; mood = st.scene === "mirror" ? "shock" : "happy"; T.jump = st.scene === "mirror" ? bounce(((u - 1.4) * 1.3) % 1) * 0.35 : 0; }
+          break;
+        }
+        case "dota":
+        case "rage": {
+          desk.visible = true;
+          desk.position.set(-0.1, FLOOR_Y, 1.0);
+          face = 0.25;
+          screen.material.color.setHex(Math.floor(t * 4) % 3 === 0 ? 0x2a6fb3 : 0x3b8fe8);
+          pcLight.material.color.setHSL((t * 0.25) % 1, 1, 0.55);
+          T.hipsY -= 0.3;                          // sitting
+          T.legX = [-1.3, -1.3];
+          T.lean = 0.12;
+          T.headX = 0.08;
+          T.headY = -0.35;                         // looking at the monitor on his right
+          const typing = st.scene === "dota" || u < 1.5;
+          T.armRX = typing ? [-0.75 + Math.sin(u * 16) * 0.12, -0.75 + Math.cos(u * 15) * 0.12] : [-2.2, -2.2];
+          T.armRZ = typing ? [0.3, -0.3] : [0.6, -0.6];
+          keyboard.position.set(0.1, 0.77, 0.15);
+          keyboard.rotation.z = 0;
+          mood = st.scene === "dota" ? (u > 6 ? "angry" : "neutral") : "angry";
+          if (st.scene === "dota" && u > 6) T.headY = Math.sin(u * 7) * 0.3;
+          if (st.scene === "rage" && u > 1.5) {
+            // keyboard flies off the desk
+            const k = u - 1.5;
+            keyboard.position.set(0.1 + k * 2.2, Math.max(0.03, 0.77 + k * 2.4 - 4.9 * k * k), 0.15 + k * 0.6);
+            keyboard.rotation.z = -k * 7;
+            T.jump = k < 0.3 ? bounce(k / 0.3) * 0.2 : 0;
+            T.hipsY += 0.3 * ease(k / 0.3);
+            T.legX = [0, 0];
+          }
+          break;
+        }
+        case "stretch": {
+          const k = ease(u / 1.2) * (1 - ease((u - 2.2) / 0.9));
+          T.armRZ = [-2.9 * k - 0.15, 2.9 * k + 0.15];
+          T.back = -0.18 * k;
+          T.headX = -0.35 * k;
+          T.hipsY += 0.06 * k;
+          T.eye = 1 - 0.7 * k;
+          mood = "happy";
+          break;
+        }
+        case "bath":
+        case "bathduck": {
+          bath.visible = true;
+          const slide = ease(u / 1.1);
+          bath.position.set(3.2 - slide * 3.2, FLOOR_Y, 0.5);
+          duck.visible = st.scene === "bathduck" && u > 1.5;
+          duck.position.set(0.6, 0.9 + Math.sin(t * 2.5) * 0.04, 0.2);
+          duck.rotation.z = Math.sin(t * 2) * 0.15;
+          if (u > 1.1) {
+            const sit = ease((u - 1.1) / 0.8);
+            T.hipsY -= 0.55 * sit;                 // sinks into the tub: legs hidden by the water
+            T.legX = [-1.5 * sit, -1.5 * sit];
+            T.armRZ = [-1.2 * sit - 0.15, 1.2 * sit + 0.15];
+            T.armRX = [0.3 * sit, 0.3 * sit];
+            T.back = -0.25 * sit;
+            T.headX = -0.15 * sit;
+            T.eye = 1 - 0.5 * sit;
+            mood = "happy";
+            if (u > 2.5 && Math.random() < dt * 3) { puff(new THREE.Vector3((Math.random() - 0.5) * 1.6, FLOOR_Y + 1.0, 0.5 + (Math.random() - 0.5) * 0.6), 1.4); }
+            if (u > L - 1.2) { const out = ease((u - (L - 1.2)) / 1.0); T.hipsY += 0.55 * out; T.legX = [-1.5 * (1 - out), -1.5 * (1 - out)]; }
+          }
+          break;
+        }
+        case "rings": {
+          cig.visible = true;
+          cig.scale.setScalar(1);
+          ember.material.color.setHex(Math.sin(t * 5) > 0 ? 0xff5a1f : 0xffa040);
+          T.eye = 0.65;
+          mood = "smug";
+          if (Math.floor(u * 1.25) !== st.lastRing && u > 0.8) {
+            st.lastRing = Math.floor(u * 1.25);
+            mouth.getWorldPosition(tmp);
+            // a ring: puffs on a circle, drifting away together
+            for (let i = 0; i < 8; i++) {
+              const a = (i / 8) * Math.PI * 2;
+              const p = puffs.find((x) => !x.visible);
+              if (!p) break;
+              p.position.set(tmp.x + Math.cos(a) * 0.12, tmp.y + Math.sin(a) * 0.12, tmp.z + 0.15);
+              p.visible = true;
+              p.userData = { life: 0, max: 2.2, vx: 0.9 + Math.cos(a) * 0.12, vy: Math.sin(a) * 0.12 + 0.05, s: 0.5 };
+            }
+          }
+          break;
+        }
+        case "nap": {
+          pillow.visible = u > 0.8;
+          pillow.position.set(0.1, FLOOR_Y + 0.11, 0.4);
+          const down = ease((u - 0.3) / 1.2) * (1 - ease((u - (L - 1.3)) / 1.0));
+          phRotZ = -Math.PI / 2 * down;
+          phZ = 0.3 * down;
+          T.hipsY -= 0.2 * down;
+          T.eye = 1 - 0.95 * down;
+          T.armRZ = [-0.3, 0.6 * down + 0.15];
+          mood = down > 0.5 ? "happy" : "neutral";
+          if (down > 0.9 && Math.random() < dt * 1.2) { head.getWorldPosition(tmp); tmp.y += 0.6; puff(tmp, 0.9); }
+          break;
+        }
+        case "levitate": {
+          const up = ease(u / 1.5) * (1 - ease((u - (L - 1.5)) / 1.4));
+          T.jump = up * 1.1 + Math.sin(t * 2) * 0.08 * up;
+          T.legX = [-2.2 * up, -2.2 * up];
+          T.armRZ = [-0.9 * up - 0.15, 0.9 * up + 0.15];
+          T.armRX = [0.6 * up, 0.6 * up];
+          T.eye = 1 - 0.85 * up;
+          T.headX = 0.1 * up;
+          phRotZ = Math.sin(t * 0.8) * 0.05 * up;
+          mood = "happy";
+          if (up > 0.8 && Math.random() < dt * 2) { puff(new THREE.Vector3((Math.random() - 0.5) * 1.2, FLOOR_Y + 0.6, 0.6), 0.8); }
+          break;
+        }
+        case "think": {
+          const k = ease(u / 0.6) * (1 - ease((u - 2.2) / 0.6));
+          T.armRX[1] = -2.4 * k;
+          T.armRZ[1] = -0.55 * k;
+          T.headZ = -0.2 * k;
+          T.headY = 0.2 * k + Math.sin(u * 5) * 0.05 * k; // scratching
+          mood = "neutral";
+          break;
+        }
+        case "facepalm": {
+          const k = ease(u / 0.4) * (1 - ease((u - 1.9) / 0.5));
+          T.armRX[1] = -2.6 * k;
+          T.armRZ[1] = -0.05;
+          T.headX = 0.45 * k;
+          mood = "sad";
+          break;
+        }
+        case "scheme": {
+          board.visible = u > 0.5;
+          const k = ease((u - 0.5) / 0.6) * (1 - ease((u - (L - 0.8)) / 0.6));
+          board.position.set(0.0, FLOOR_Y + 1.6 + 0.4 * k, 1.0);
+          board.rotation.x = -0.15;
+          T.armRX = [-1.7 * k, -1.7 * k];
+          T.armRZ = [0.55 * k - 0.15, -0.55 * k + 0.15];
+          T.headX = 0.35 * k;
+          T.headY = Math.sin(u * 2.5) * 0.25 * k; // searching the chart
+          mood = u > 4.5 ? "sad" : "neutral";
+          break;
+        }
+        case "adjika": {
+          jar.visible = spoon.visible = u > 0.4;
+          const k = ease((u - 0.4) / 0.6) * (1 - ease((u - (L - 0.8)) / 0.6));
+          jar.position.set(-0.45, FLOOR_Y + 1.35, 0.85);
+          T.armRX[0] = -1.4 * k; T.armRZ[0] = 0.5 * k - 0.15;
+          const bite = ((u - 1) * 1.1) % 1;
+          const lift = u > 1 ? bounce(bite) : 0;
+          spoon.position.set(0.35 - lift * 0.25, FLOOR_Y + 1.3 + lift * 0.75, 0.75 - lift * 0.1);
+          spoon.rotation.z = -0.3 - lift * 0.9;
+          T.armRX[1] = (-1.3 - lift * 1.1) * k; T.armRZ[1] = (-0.4 + lift * 0.2) * k;
+          mood = lift > 0.6 ? "happy" : "neutral";
+          if (u > 3) M.skin.color.setHex(0xf7b8a0);
+          break;
+        }
+      }
     }
 
     if (st.task) {
@@ -497,7 +879,9 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
     J.jump = T.jump; // jumps are already smooth curves
     st.look = lerp(st.look, face, 1 - Math.exp(-dt * 6));
     phil.rotation.y = st.look;
-    phil.position.y = -0.06 + J.jump;
+    phil.rotation.z = phRotZ;
+    phil.rotation.x = phRotX;
+    phil.position.set(phX, -0.06 + J.jump, phZ);
     hips.position.y = J.hipsY;
     hips.rotation.x = J.lean + J.back;
     head.rotation.set(J.headX, J.headY, J.headZ);
@@ -509,7 +893,7 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
       if (mood === "angry") b.position.y = 0.3;
     }
     setMouth(mood === "angry" ? "sad" : mood);
-    M.skin.color.setHex(mood === "angry" ? 0xf6aa8e : COLORS.skin); // red in the face
+    if (!(st.scene === "adjika" && st.sceneT > 3)) M.skin.color.setHex(mood === "angry" ? 0xf6aa8e : COLORS.skin); // red in the face
 
     // Sunglasses slide down from above and sit on the eyes
     st.shades = lerp(st.shades, st.shadesOn ? 1 : 0, 1 - Math.exp(-dt * 7));
@@ -529,6 +913,8 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
       p.material.opacity = 0.55 * (1 - f) * Math.min(1, u.life * 5);
     }
 
+    const wantFov = st.scene ? 36 : 26;
+    if (Math.abs(camera.fov - wantFov) > 0.1) { camera.fov = lerp(camera.fov, wantFov, 1 - Math.exp(-dt * 6)); camera.updateProjectionMatrix(); }
     renderer.render(scene, camera);
     placeBubble();
     requestAnimationFrame(frame);
@@ -553,9 +939,10 @@ export function createPhil3D(root, { bubble, onClick, onContext } = {}) {
 
   requestAnimationFrame(frame);
   return {
-    react, smoke, shoot,
+    react, smoke, shoot, play,
+    get scene() { return st.scene; },
     glasses(on) { if (!(on && st.task)) st.shadesOn = on; },
-    get busy() { return !!st.task || st.smokeT >= 0 || !!st.react; },
+    get busy() { return !!st.task || st.smokeT >= 0 || !!st.react || !!st.scene; },
     get smoking() { return st.smokeT >= 0; }, get puffs() { return puffs.filter((p) => p.visible).length; }
   };
 }
@@ -573,6 +960,24 @@ function ballTexture() {
   g.beginPath(); g.moveTo(0, 64); g.lineTo(256, 64); g.stroke();
   for (const x of [64, 192]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 128); g.stroke(); }
   for (const x of [0, 128, 256]) { g.beginPath(); g.ellipse(x, 64, 34, 64, 0, 0, Math.PI * 2); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// The famous scheme: boxes and arrows, with a question mark where Phil should be
+function schemeTexture() {
+  const c = document.createElement("canvas");
+  c.width = 360; c.height = 260;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff8ec";
+  g.fillRect(0, 0, 360, 260);
+  g.strokeStyle = "#1b0d07"; g.lineWidth = 3; g.fillStyle = "#1b0d07";
+  g.font = "bold 20px Manrope, sans-serif"; g.textAlign = "center";
+  const box = (x, y, w, h, label) => { g.strokeRect(x, y, w, h); g.fillText(label, x + w / 2, y + h / 2 + 7); };
+  box(20, 20, 120, 50, "Фарм"); box(220, 20, 120, 50, "FunPay"); box(20, 120, 120, 50, "Диваны"); box(220, 120, 120, 50, "Рубли"); box(120, 200, 120, 45, "ПК");
+  g.beginPath(); g.moveTo(140, 45); g.lineTo(220, 45); g.moveTo(80, 70); g.lineTo(80, 120); g.moveTo(140, 145); g.lineTo(220, 145); g.moveTo(280, 70); g.lineTo(280, 120); g.moveTo(280, 170); g.lineTo(200, 200); g.stroke();
+  g.fillStyle = "#c8102e"; g.font = "bold 46px Anton, Impact, sans-serif"; g.fillText("?", 180, 110);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

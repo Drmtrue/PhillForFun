@@ -68,6 +68,7 @@ export function mountFarm(el, ctx) {
     q(".fm-sell").disabled = false;
     q(".fm-event").textContent = real ? `Стартовая цена — от сегодняшней на FunPay (${fmtRub(real)} за Divine), в начале лиги втрое дороже.` : "";
     ctx.say(LINES.start, { force: true });
+    ctx.scene?.("dota");
     clearInterval(timer);
     timer = setInterval(tick, 100);
     s.dayStarted = performance.now();
@@ -103,7 +104,7 @@ export function mountFarm(el, ctx) {
     if (!s || !s.running) return;
     if (s.day < s.afkUntil) { flash(e, "🛁 в ванне"); return; }
     const r = Math.random();
-    if (r < STACK * s.dropMult) { s.divs += 5; flash(e, "+5 💎"); ctx.sfx.egg(); ctx.say(LINES.stack); }
+    if (r < STACK * s.dropMult) { s.divs += 5; flash(e, "+5 💎"); ctx.sfx.egg(); ctx.say(LINES.stack); ctx.scene?.("divine"); }
     else if (r < (STACK + DROP) * s.dropMult) { s.divs += 1; flash(e, "+1 💎"); ctx.sfx.pop(0.4); }
     else ctx.sfx.pop(0.12);
     render();
@@ -118,6 +119,7 @@ export function mountFarm(el, ctx) {
       money /= 2;
       q(".fm-event").textContent = `🚨 Скам: покупатель открыл арбитраж, пришла только половина (${fmtRub(money)}).`;
       ctx.say(LINES.scam, { force: true });
+      ctx.scene?.("rage");
       ctx.unlock("farm_scam");
       s.scammed = true;
     } else ctx.say(LINES.sell);

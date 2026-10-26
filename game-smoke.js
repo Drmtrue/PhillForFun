@@ -110,7 +110,7 @@ export function mountSmoke(el, ctx) {
       st.cigs++;
       ctx.say(LINES.cig);
       if (st.cigs >= 20) ctx.unlock("smk_pack");
-      if (st.cigs % 5 === 0) ctx.phil.smoke();
+      if (st.cigs % 5 === 0 && !ctx.scene?.("rings")) ctx.phil.smoke();
       if (st.cigs % 25 === 0) ctx.log?.("smoke_milestone", { cigs: st.cigs });
     }
     checkAch();

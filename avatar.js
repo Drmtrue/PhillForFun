@@ -1,3 +1,5 @@
+import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610251904";
+
 // Phil the mascot: a 3D cartoon Phil who walks along the bottom of the screen (phil3d.js), with a flat
 // anime-style SVG badge as the fallback. He reacts to game events with a speech bubble and now and
 // then lights a cigarette (his signature move).
@@ -177,10 +179,16 @@ const LINES = {
 
 const MOODS = ["neutral", "happy", "sad", "shock", "smug"];
 const last = {};
+let unlockedPools = new Set(); // ids of line pools unlocked through talents (set by setProgress)
 function pickLine(key, ev = LINES[key]) {
-  const list = ev.lines;
+  // Unlocked talent lines join the pool for that event (base lines stay, so he does not repeat only the new ones)
+  let list = ev.lines;
+  const extra = [];
+  for (const pool of unlockedPools) for (const t of TALENT_LINES[pool]?.[key] || []) extra.push(t);
+  if (extra.length) list = list.concat(extra);
   let i = Math.floor(Math.random() * list.length);
   if (list.length > 1 && i === last[key]) i = (i + 1) % list.length;
+  if (extra.length && Math.random() < 0.5) i = list.length - 1 - Math.floor(Math.random() * extra.length); // prefer sharp lines half the time
   last[key] = i;
   const l = list[i];
   return typeof l === "string" ? { t: l } : l;
@@ -290,7 +298,7 @@ export function initAvatar({ onLine } = {}) {
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610251836")
+  import("./phil3d.js?v=202610251904")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, {
         bubble,
@@ -336,6 +344,38 @@ export function initAvatar({ onLine } = {}) {
     });
   }
   const isSmoking = () => (body3d ? body3d.busy : smoking);
+
+  // ----- Talents: animations and lines unlocked by everyone's play
+  let progress = progressFrom({});
+  const unlockedAnims = () => TALENTS.filter((t) => t.anim && progress.unlocked.has(t.id)).map((t) => t.anim);
+  function setProgress(xp) {
+    const before = progress.unlocked;
+    progress = progressFrom(xp);
+    unlockedPools = new Set(TALENTS.filter((t) => t.lines && progress.unlocked.has(t.id)).map((t) => t.lines));
+    const fresh = TALENTS.filter((t) => progress.unlocked.has(t.id) && !before.has(t.id));
+    return fresh;
+  }
+  // Scenes tied to game moments: played only when that talent is open
+  const SCENE_FOR = { wrong: ["facepalm"], correct: ["think"], basket: ["loot"], endZero: ["facepalm"], farm_stack: ["divine"], farm_scam: ["rage"], bath_start: ["bath", "bathduck"] };
+  function playScene(name) {
+    if (!body3d || !progress.unlocked.size || document.hidden) return false;
+    const have = unlockedAnims();
+    if (!have.includes(name)) return false;
+    return body3d.play(name);
+  }
+  function sceneFor(key) {
+    const list = (SCENE_FOR[key] || []).filter((n) => unlockedAnims().includes(n));
+    if (!list.length || Math.random() > 0.5) return;
+    body3d.play(list[list.length - 1]); // the highest unlocked variant (e.g. bath with the duck)
+  }
+  // Idle show: every 40–90 s he performs one of the unlocked animations
+  (function scheduleShow() {
+    setTimeout(() => {
+      const have = unlockedAnims();
+      if (have.length && body3d && !body3d.busy && bubble.hidden && !document.hidden) body3d.play(have[Math.floor(Math.random() * have.length)]);
+      scheduleShow();
+    }, 40000 + Math.random() * 50000);
+  })();
 
   // ----- Phil shoots at the side-court hoop now and then (5% to make it)
   const MAKE_CHANCE = 0.05;
@@ -407,6 +447,7 @@ export function initAvatar({ onLine } = {}) {
       if (!smoking) setMood(ev.mood);
     }
     if (line.smoke) setTimeout(smoke, 400);
+    if (body3d && !body3d.busy) sceneFor(lineKey);
     clearTimeout(hideTimer);
     hideTimer = setTimeout(() => { bubble.hidden = true; current = null; }, Math.max(3200, line.t.length * 70));
   }
@@ -433,5 +474,5 @@ export function initAvatar({ onLine } = {}) {
     }, 2500 + Math.random() * 4000);
   })();
 
-  return { say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot };
+  return { say, smoke, el: root, useCourt: (c) => { court = c; }, courtResult, shoot: tryShot, setProgress, playScene, get progress() { return progress; } };
 }

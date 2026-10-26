@@ -58,6 +58,7 @@ export function mountBath(el, ctx) {
     q(".bt-start").hidden = true;
     q(".bt-hot").disabled = q(".bt-splash").disabled = false;
     ctx.say(LINES.start, { force: true });
+    if (!ctx.scene?.("bathduck")) ctx.scene?.("bath");
     last = performance.now();
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);

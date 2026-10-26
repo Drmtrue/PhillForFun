@@ -17,6 +17,7 @@ The site is a single page with hash routes, so switching sections never reloads 
 | `#/rmt` | RMT exchange page (`rmt-page.js`): sticky in-page menu, overview cards, charts, order book, season timelines, savings goal with a farm-rate calculator, method notes |
 | `#/games` | Mini-games list: free-throw practice (inline), the side-court hoop, and links to the full-screen games below |
 | `#/games/smoke`, `#/games/farm`, `#/games/bath` | Перекур-кликер, Фарм диванов, Ванна (see below) |
+| `#/phil` | Phil's talent tree: shared progression, four branches with levels, XP bars and the talents each unlocks |
 | `#/ach` | Achievements shared by the whole site |
 
 ### Mini-games
@@ -30,6 +31,21 @@ Each full-screen game is its own module with a `mount<Name>(el, ctx)` function. 
 Achievements: 3 for the clicker, 4 for the farm, 3 for the bath, plus 2 for free-throw practice streaks.
 
 To add another game, add a card and a `.game-view` to `index.html`, a module with `mount…(el, ctx)`, and register it in `GAMES` in `app.js`.
+
+## Phil's progression
+
+Phil is levelled up by everyone together. Every event in the feed also grants XP to one of four talent branches (`xpFor()` in the Worker, stored in `phil_xp`, served by `GET /phil`):
+
+| Branch | XP from |
+| --- | --- |
+| 🏀 Баскетбол (`hoops`) | side-court baskets, free-throw sessions, Phil's own shots (a make is +120) |
+| 💎 РМТ-фарм (`farm`) | leagues in «Фарм диванов», scaled by the rubles earned |
+| 🛁 Релакс (`chill`) | bath time, clicker milestones, Phil's comments |
+| 🧠 Эрудиция (`mind`) | quiz results (bonus for 10/10), facts about Phil, achievements |
+
+`talents.js` turns branch XP into levels (level n needs 50·n·(n+1) XP, max 10) and lists 28 talents, each unlocking an animation and/or a pool of sharper lines. Animations are procedural scenes in `phil3d.js` (`play(name)`): dribbling, ball on the finger, a running dunk, a dunk that shatters the backboard, loot dance, a Divine drop, a Dota session at a desk, a rage quit with a flying keyboard, a Mirror drop, stretching, a bath (later with a rubber duck), smoke rings, a nap on a pillow, levitation, scratching his head, a facepalm, studying the scheme, eating adjika. While a scene plays the canvas grows into a wider stage. Unlocked lines (`TALENT_LINES`) are mixed into Phil's existing pools for the matching events (trash talk at misses, roasts of wrong answers, FunPay seller talk, and so on).
+
+Scenes play on matching moments (a facepalm on a wrong answer, the bath when the bath game starts, a Divine drop on a stack, a rage quit on a scam) and as an idle show every 40–90 s. When a browser sees a talent open since its last visit, a toast announces it and Phil performs it.
 
 ## Event feed
 
@@ -89,6 +105,7 @@ After that, every push to `main` redeploys both the site (GitHub Pages) and the 
 | --- | --- | --- |
 | `GET` | `/questions` | Player-generated questions |
 | `GET` | `/events` | Event feed, newest first (`limit`, `before`, `after`) |
+| `GET` | `/phil` | Phil's shared XP per talent branch and the number of players who contributed |
 | `POST` | `/events` | Log a page-side event `{ type, name, data }` |
 | `GET` | `/scores` | Leaderboard: attempts, total points, average and achievement count per player, sorted by average |
 | `GET` | `/player?name=` | One player's attempts, points, average and side-court baskets |

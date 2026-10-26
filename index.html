@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610251836">
+  <link rel="stylesheet" href="style.css?v=202610251904">
 </head>
 <body>
   <!-- Background: court lines and bath bubbles -->
@@ -41,6 +41,7 @@
       <a href="#/quiz" data-page="quiz"><span aria-hidden="true">🧠</span><b>Квиз</b></a>
       <a href="#/rmt" data-page="rmt"><span aria-hidden="true">💎</span><b>Биржа РМТ</b></a>
       <a href="#/games" data-page="games"><span aria-hidden="true">🎮</span><b>Мини-игры</b></a>
+      <a href="#/phil" data-page="phil"><span aria-hidden="true">🌳</span><b>Таланты</b></a>
       <a href="#/ach" data-page="ach"><span aria-hidden="true">🏆</span><b>Ачивки</b></a>
     </nav>
 
@@ -248,6 +249,16 @@
       </div>
     </section>
 
+    <!-- Phil's talents (shared progression) -->
+    <section class="page" data-page="phil" hidden>
+      <div class="page-head">
+        <p class="kicker"><span class="dot"></span> общая прокачка</p>
+        <h1 class="page-title">Таланты Фила</h1>
+        <p class="lead">Фила качают все вместе: каждая игра, бросок, факт и ачивка на сайте идут ему в опыт. Новые уровни открывают анимации и острые фразы.</p>
+      </div>
+      <div id="phil-tree" class="tree"><p class="muted">Загружаю…</p></div>
+    </section>
+
     <!-- Achievements (shared by every section) -->
     <section class="page" data-page="ach" hidden>
       <div class="page-head">
@@ -272,8 +283,8 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="hoop-hud" id="hoop-hud" title="Попадания в боковое кольцо. Считаются отдельно от ответов.">🏀 <b id="hoop-count">0</b> <span>в кольцо</span></div>
 
-  <script src="questions.js?v=202610251836"></script>
-  <script src="achievements.js?v=202610251836"></script>
-  <script type="module" src="app.js?v=202610251836"></script>
+  <script src="questions.js?v=202610251904"></script>
+  <script src="achievements.js?v=202610251904"></script>
+  <script type="module" src="app.js?v=202610251904"></script>
 </body>
 </html>

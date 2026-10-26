@@ -1,13 +1,15 @@
-import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251836";
-import { renderRmt } from "./rmt-page.js?v=202610251836";
-import { initHoop } from "./hoop.js?v=202610251836";
-import { freeThrow } from "./freethrow.js?v=202610251836";
-import { onSkinChange } from "./ballskin.js?v=202610251836";
-import { mountSmoke } from "./game-smoke.js?v=202610251836";
-import { mountFarm } from "./game-farm.js?v=202610251836";
-import { mountBath } from "./game-bath.js?v=202610251836";
-import { initFeed } from "./feed.js?v=202610251836";
-import { initAvatar } from "./avatar.js?v=202610251836";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610251904";
+import { renderRmt } from "./rmt-page.js?v=202610251904";
+import { initHoop } from "./hoop.js?v=202610251904";
+import { freeThrow } from "./freethrow.js?v=202610251904";
+import { onSkinChange } from "./ballskin.js?v=202610251904";
+import { mountSmoke } from "./game-smoke.js?v=202610251904";
+import { mountFarm } from "./game-farm.js?v=202610251904";
+import { mountBath } from "./game-bath.js?v=202610251904";
+import { renderTree } from "./tree.js?v=202610251904";
+import { TALENTS } from "./talents.js?v=202610251904";
+import { initFeed } from "./feed.js?v=202610251904";
+import { initAvatar } from "./avatar.js?v=202610251904";
 
 const phil = initAvatar({ onLine: philLine }); // Phil the mascot: comments on what happens
 
@@ -1103,7 +1105,8 @@ function gameCtx(id) {
     goalRub: RMT_GOAL.priceRub,
     divinePrice: () => lastPrices?.find((r) => r.short === "PoE 1")?.price || null,
     onShow: (fn, once) => (gameShowHooks[id] ||= []).push({ fn, once }),
-    log: logEvent
+    log: logEvent,
+    scene: (name) => phil.playScene(name)
   };
 }
 mountSmoke($("g-smoke"), gameCtx("smoke"));
@@ -1112,7 +1115,7 @@ mountBath($("g-bath"), gameCtx("bath"));
 const GAMES = ["smoke", "farm", "bath"];
 
 /* ---------- Sections (hash routes) ---------- */
-const PAGES = ["home", "quiz", "rmt", "games", "ach"];
+const PAGES = ["home", "quiz", "rmt", "games", "phil", "ach"];
 function route() {
   const [, name, sub] = location.hash.match(/^#\/?([\w-]+)?\/?([\w-]+)?/) || [];
   const page = PAGES.includes(name) ? name : "home";
@@ -1137,6 +1140,32 @@ window.addEventListener("hashchange", route);
 route();
 
 
+/* ---------- Phil's talents (shared progression) ---------- */
+const SEEN_TALENTS_KEY = "phill_talents_seen";
+let philXp = {};
+async function loadProgress() {
+  if (!API) { renderTree($("phil-tree"), phil.progress, {}, 0); return; }
+  try {
+    const p = await api("/phil");
+    philXp = p.xp || {};
+    phil.setProgress(philXp);
+    renderTree($("phil-tree"), phil.progress, philXp, p.players || 0);
+    // Announce talents that opened since this browser last looked (not the very first load)
+    const seen = new Set(store.get(SEEN_TALENTS_KEY, null) || []);
+    const firstTime = !store.get(SEEN_TALENTS_KEY, null);
+    const news = [...phil.progress.unlocked].filter((id) => !seen.has(id));
+    store.set(SEEN_TALENTS_KEY, [...phil.progress.unlocked]);
+    if (!firstTime && news.length) {
+      const t = ACH_TALENT(news[0]);
+      toast(`🌳 Новый талант Фила: ${t.icon} ${t.title}`, news.length > 1 ? `И ещё ${news.length - 1}. Смотри раздел «Таланты».` : t.desc);
+      sfx.achievement();
+      if (t.anim) setTimeout(() => phil.playScene(t.anim), 1500);
+    }
+  } catch (e) { console.error(e); }
+}
+const ACH_TALENT = (id) => TALENTS.find((t) => t.id === id) || { icon: "🌳", title: id, desc: "" };
+setInterval(() => { if (!document.hidden) loadProgress(); }, 60000);
+
 /* ---------- Event feed (home page) ---------- */
 const feed = API ? initFeed($("feed"), {
   api,
@@ -1151,7 +1180,10 @@ function logEvent(type, data = {}) {
   if (!API) return;
   const body = JSON.stringify({ type, name: getName() || "Гость", data });
   fetch(`${API}/events`, { method: "POST", headers: { "Content-Type": "text/plain" }, body, keepalive: true })
-    .then(() => feed && document.body.dataset.page === "home" && setTimeout(() => feed.refresh(), 800))
+    .then(() => {
+      if (feed && document.body.dataset.page === "home") setTimeout(() => feed.refresh(), 800);
+      setTimeout(loadProgress, 1200);
+    })
     .catch(() => {});
 }
 
@@ -1180,6 +1212,7 @@ window.addEventListener("pagehide", () => {
 });
 
 /* ---------- Startup ---------- */
+loadProgress();
 $("player-name").value = getName();
 $("fact-block").hidden = !API;
 updateFoot();
