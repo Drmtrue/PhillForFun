@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
-import { generateQuestions, regenerateAnswer } from "./generate.js";
+import { generateQuestions, regenerateAnswer, PHIL_PERSONA } from "./generate.js";
+import { analyzePhotos, generateContent, generateQuiz, generateTheme, generateAnims } from "./builder-ai.js";
 import { fetchDivinePrices } from "./prices.js";
 
 const CORS = {
@@ -8,6 +9,14 @@ const CORS = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Max-Age": "86400"
 };
+
+// ----- Portals: Phil lives in the original store ("main"); every other portal gets its own Durable Object.
+// Accounts, invites and portal drafts live in the "platform" object.
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
+const RESERVED = new Set(["phil", "admin", "api", "create", "builder", "platform", "main", "www", "new"]);
+const storeFor = (env, slug) => env.STORE.get(env.STORE.idFromName(slug === "phil" ? "main" : `portal:${slug}`));
+const platformOf = (env) => env.STORE.get(env.STORE.idFromName("platform"));
+const bearer = (request) => (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -63,10 +72,26 @@ export default {
 
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
-    const store = env.STORE.get(env.STORE.idFromName("main"));
     const ip = request.headers.get("CF-Connecting-IP") || "local";
+    const platform = platformOf(env);
 
     try {
+      // ---------- Platform: accounts, invites, portal directory and the builder ----------
+      if (path.startsWith("/auth") || path.startsWith("/me") || path.startsWith("/invites") || path.startsWith("/portals") ||
+          path === "/portal" || path.startsWith("/builder") || path.startsWith("/admin/platform")) {
+        return await platformRoutes(request, env, url, path, ip, platform);
+      }
+
+      // ---------- Everything below belongs to one portal (?portal=slug, Phil by default) ----------
+      const slug = (url.searchParams.get("portal") || "phil").toLowerCase();
+      if (slug !== "phil") {
+        if (!SLUG_RE.test(slug)) return json({ error: "Портал не найден" }, 404);
+        const info = await platform.portalInfo(slug);
+        if (!info || info.status !== "published") return json({ error: "Портал не найден" }, 404);
+      }
+      const store = storeFor(env, slug);
+      const persona = slug === "phil" ? PHIL_PERSONA : await platform.portalPersona(slug);
+
       // Generated questions for the game
       if (path === "/questions" && request.method === "GET") {
         return json({ questions: await store.listQuestions() });
@@ -102,7 +127,7 @@ export default {
 
       // Cheapest Divine Orb prices on FunPay (cached, refreshed at most every 20 minutes)
       if (path === "/prices" && request.method === "GET") {
-        return json(await store.divinePrices(fetchDivinePrices));
+        return json(await storeFor(env, "phil").divinePrices(fetchDivinePrices));
       }
 
       // Side-court baskets (counted separately from quiz points)
@@ -174,14 +199,14 @@ export default {
         const perHour = Number(env.FACTS_PER_HOUR_PER_IP || 20);
         const perDay = Number(env.FACTS_PER_DAY_TOTAL || 100);
         if (!(await store.allow(ip, "fact", perHour, 3600))) {
-          return json({ error: `Не больше ${perHour} фактов в час. Фил столько не работал, и ты отдохни.` }, 429);
+          return json({ error: `Не больше ${perHour} фактов в час. Отдохни немного.` }, 429);
         }
         if (!(await store.allow("all", "fact", perDay, 86400))) {
           return json({ error: "На сегодня лимит фактов исчерпан. Приходи завтра!" }, 429);
         }
 
         const context = await store.context();
-        const result = await generateQuestions(env, fact, context);
+        const result = await generateQuestions(env, fact, context, persona);
         if (!result.accepted) {
           await store.logFact(fact, author, ip, "rejected", result.reason);
           return json({ accepted: false, reason: result.reason });
@@ -237,7 +262,7 @@ export default {
           const slot = body.slot === "correct" ? "correct" : Number(body.slot);
           if (slot !== "correct" && ![0, 1, 2].includes(slot)) return json({ error: "Неизвестный ответ" }, 400);
           let text;
-          try { text = await regenerateAnswer(env, cur, slot, cur.fact); }
+          try { text = await regenerateAnswer(env, cur, slot, cur.fact, persona); }
           catch (e) { console.error(e); return json({ error: "Root AI не справился, попробуй ещё раз" }, 502); }
           const next = { q: cur.q, correct: cur.correct, wrong: [...cur.wrong] };
           if (slot === "correct") next.correct = text; else next.wrong[slot] = text;
@@ -253,6 +278,105 @@ export default {
     }
   }
 };
+
+// ---------- Platform routes ----------
+async function platformRoutes(request, env, url, path, ip, platform) {
+  const body = request.method === "GET" || request.method === "DELETE" ? {} : await request.json().catch(() => ({}));
+  const key = bearer(request);
+  const user = key && key !== env.ADMIN_TOKEN ? await platform.userByKey(key) : null;
+  const needUser = () => (user ? null : json({ error: "Нужно войти по приглашению" }, 401));
+  const aiReady = () => (env.AI_API_KEY || env.ANTHROPIC_API_KEY ? null : json({ error: "Root AI не настроен" }, 503));
+
+  // Join with an invite code: creates an account and returns its secret key once
+  if (path === "/auth/redeem" && request.method === "POST") {
+    if (!(await platform.allow(ip, "redeem", 20, 3600))) return json({ error: "Слишком много попыток" }, 429);
+    const r = await platform.redeem(clean(body.code, 40).toUpperCase(), clean(body.name, 30));
+    return r.error ? json(r, 400) : json(r);
+  }
+  if (path === "/me" && request.method === "GET") {
+    const err = needUser(); if (err) return err;
+    return json(await platform.me(user.id));
+  }
+  if (path === "/invites" && request.method === "POST") {
+    const err = needUser(); if (err) return err;
+    const r = await platform.createInvite(user.id);
+    return r.error ? json(r, 400) : json(r);
+  }
+  if (path === "/portals" && request.method === "GET") return json({ portals: await platform.listPortals() });
+  if (path === "/portal" && request.method === "GET") {
+    const slug = clean(url.searchParams.get("slug"), 40).toLowerCase();
+    const p = await platform.getPortal(slug, user?.id || null);
+    return p ? json(p) : json({ error: "Портал не найден" }, 404);
+  }
+
+  // ----- Builder (owner only) -----
+  if (path.startsWith("/builder")) {
+    const err = needUser(); if (err) return err;
+    if (path === "/builder/draft" && request.method === "GET") return json({ draft: await platform.draftOf(user.id) });
+    if (path === "/builder/draft" && request.method === "POST") {
+      const slug = clean(body.slug, 30).toLowerCase();
+      if (!SLUG_RE.test(slug) || RESERVED.has(slug)) return json({ error: "Адрес: 3–30 латинских букв, цифр и дефисов" }, 400);
+      if (!body.consent) return json({ error: "Нужно подтвердить, что человек согласен" }, 400);
+      const r = await platform.createDraft(user.id, slug, clean(body.name, 40));
+      return r.error ? json(r, 400) : json(r);
+    }
+    if (path === "/builder/draft" && request.method === "PATCH") {
+      const r = await platform.patchDraft(user.id, body);
+      return r.error ? json(r, 400) : json(r);
+    }
+    if (path === "/builder/draft" && request.method === "DELETE") return json(await platform.deleteDraft(user.id));
+    if (path === "/builder/publish" && request.method === "POST") {
+      const r = await platform.publish(user.id);
+      return r.error ? json(r, 400) : json(r);
+    }
+    // Root AI steps
+    if (path === "/builder/photos" || path === "/builder/step") {
+      const e2 = aiReady(); if (e2) return e2;
+      if (!(await platform.allow(`u${user.id}`, "builder", user.admin ? 400 : 60, 86400))) return json({ error: "На сегодня лимит генераций исчерпан" }, 429);
+      if (!(await platform.allow("all", "builder", Number(env.BUILDER_PER_DAY || 600), 86400))) return json({ error: "Root AI на сегодня устал. Приходи завтра" }, 429);
+      const draft = await platform.draftOf(user.id);
+      if (!draft) return json({ error: "Сначала начни портал" }, 400);
+      try {
+        if (path === "/builder/photos") {
+          const images = (Array.isArray(body.images) ? body.images : []).filter((x) => typeof x === "string" && x.length < 1_500_000).slice(0, 5);
+          if (!images.length) return json({ error: "Нужно хотя бы одно фото" }, 400);
+          const r = await analyzePhotos(env, images, draft.name);
+          if (!r.ok) return json(r);
+          await platform.patchDraft(user.id, { look: r.look, summary: r.summary });
+          return json(r); // the page crops the face itself and saves it with PATCH { face }
+        }
+        const step = String(body.step || "");
+        const d = draft.data;
+        if (!d.facts?.length) return json({ error: "Сначала добавь факты" }, 400);
+        const ctx = { name: draft.name, facts: d.facts, summary: d.summary || "", persona: d.persona };
+        let r;
+        if (step === "content") r = await generateContent(env, ctx);
+        else if (!d.persona) return json({ error: "Сначала сгенерируй шутки и ачивки" }, 400);
+        else if (step === "quiz") r = await generateQuiz(env, ctx);
+        else if (step === "theme") r = await generateTheme(env, ctx);
+        else if (step === "anims") r = await generateAnims(env, ctx);
+        else return json({ error: "Неизвестный шаг" }, 400);
+        if (!r.ok) return json(r);
+        const { ok, ...data } = r;
+        await platform.patchDraft(user.id, data);
+        return json({ ok: true, draft: await platform.draftOf(user.id) });
+      } catch (e) {
+        console.error("builder", e);
+        return json({ error: "Root AI не справился, попробуй ещё раз" }, 502);
+      }
+    }
+  }
+
+  // ----- Admin (ADMIN_TOKEN): own account, invites, portals -----
+  if (path.startsWith("/admin/platform")) {
+    if (!env.ADMIN_TOKEN || key !== env.ADMIN_TOKEN) return json({ error: "Нет доступа" }, 401);
+    if (path === "/admin/platform/account" && request.method === "POST") return json(await platform.createAdmin(clean(body.name, 30) || "Админ"));
+    if (path === "/admin/platform/portals" && request.method === "GET") return json({ portals: await platform.listPortals(true) });
+    const m = path.match(/^\/admin\/platform\/portals\/([a-z0-9-]+)$/);
+    if (m && request.method === "DELETE") return json(await platform.adminDelete(m[1]));
+  }
+  return json({ error: "Не найдено" }, 404);
+}
 
 export class QuizStore extends DurableObject {
   constructor(ctx, env) {
@@ -322,6 +446,33 @@ export class QuizStore extends DurableObject {
           data TEXT NOT NULL,
           count INTEGER NOT NULL DEFAULT 1
         )`,
+      `CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          key_hash TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          invited_by INTEGER,
+          admin INTEGER NOT NULL DEFAULT 0,
+          portal_quota INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL
+        )`,
+      `CREATE TABLE IF NOT EXISTS invites (
+          code TEXT PRIMARY KEY,
+          owner INTEGER NOT NULL,
+          used_by INTEGER,
+          created_at INTEGER NOT NULL,
+          used_at INTEGER
+        )`,
+      `CREATE TABLE IF NOT EXISTS portals (
+          slug TEXT PRIMARY KEY,
+          owner INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          status TEXT NOT NULL,
+          data TEXT NOT NULL,
+          face TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          published_at INTEGER
+        )`,
       `CREATE TABLE IF NOT EXISTS phil_xp (
           branch TEXT PRIMARY KEY,
           xp INTEGER NOT NULL DEFAULT 0,
@@ -346,6 +497,129 @@ export class QuizStore extends DurableObject {
         )`
     ];
     for (const q of schema) this.sql.exec(q);
+  }
+
+  // ---------- Platform (used only in the "platform" object) ----------
+  async hash(key) {
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  randomCode(len, alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789") {
+    const bytes = crypto.getRandomValues(new Uint8Array(len));
+    return [...bytes].map((b) => alphabet[b % alphabet.length]).join("");
+  }
+  async newUser(name, invitedBy, admin) {
+    const key = this.randomCode(28, "abcdefghijkmnpqrstuvwxyz23456789");
+    this.sql.exec("INSERT INTO users (key_hash, name, invited_by, admin, created_at) VALUES (?, ?, ?, ?, ?)", await this.hash(key), name, invitedBy, admin ? 1 : 0, Date.now());
+    const id = this.sql.exec("SELECT last_insert_rowid() AS id").one().id;
+    return { key, user: { id, name, admin: !!admin } };
+  }
+  async userByKey(key) {
+    if (!key || key.length < 20) return null;
+    const u = this.sql.exec("SELECT id, name, admin, portal_quota FROM users WHERE key_hash = ?", await this.hash(key)).toArray()[0];
+    return u ? { id: u.id, name: u.name, admin: !!u.admin, quota: u.portal_quota } : null;
+  }
+  async redeem(code, name) {
+    if (!name) return { error: "Как тебя зовут?" };
+    const inv = this.sql.exec("SELECT code, owner, used_by FROM invites WHERE code = ?", code).toArray()[0];
+    if (!inv) return { error: "Такого приглашения нет" };
+    if (inv.used_by) return { error: "Это приглашение уже использовали" };
+    const r = await this.newUser(name, inv.owner, false);
+    this.sql.exec("UPDATE invites SET used_by = ?, used_at = ? WHERE code = ?", r.user.id, Date.now(), code);
+    return r;
+  }
+  createAdmin(name) { return this.newUser(name, null, true); }
+  me(userId) {
+    const u = this.sql.exec("SELECT id, name, admin, portal_quota FROM users WHERE id = ?", userId).one();
+    const invites = this.sql.exec("SELECT i.code, i.used_by, u.name AS used_name FROM invites i LEFT JOIN users u ON u.id = i.used_by WHERE i.owner = ? ORDER BY i.created_at", userId).toArray()
+      .map((i) => ({ code: i.code, used: !!i.used_by, by: i.used_name || null }));
+    const portals = this.sql.exec("SELECT slug, name, status FROM portals WHERE owner = ? ORDER BY created_at", userId).toArray();
+    return { user: { id: u.id, name: u.name, admin: !!u.admin, quota: u.admin ? null : u.portal_quota }, invites, invitesLeft: u.admin ? null : Math.max(0, 5 - invites.length), portals };
+  }
+  createInvite(userId) {
+    const u = this.sql.exec("SELECT admin FROM users WHERE id = ?", userId).one();
+    const n = this.sql.exec("SELECT COUNT(*) AS n FROM invites WHERE owner = ?", userId).one().n;
+    if (!u.admin && n >= 5) return { error: "Приглашения закончились" };
+    const code = `${this.randomCode(4)}-${this.randomCode(4)}`;
+    this.sql.exec("INSERT INTO invites (code, owner, created_at) VALUES (?, ?, ?)", code, userId, Date.now());
+    return { code };
+  }
+
+  // Portals: the draft is a JSON blob the builder fills step by step; publishing freezes it for visitors
+  portalRow(slug) { return this.sql.exec("SELECT * FROM portals WHERE slug = ?", slug).toArray()[0]; }
+  portalInfo(slug) { const r = this.portalRow(slug); return r ? { status: r.status, owner: r.owner } : null; }
+  portalPersona(slug) {
+    const r = this.portalRow(slug);
+    const d = r ? JSON.parse(r.data) : {};
+    const site = d.site || {};
+    return {
+      title: `${site.title1 || ""} ${site.title2 || ""}`.trim() || r?.name || slug,
+      name: d.persona?.forms?.nom || r?.name || slug,
+      about: d.persona?.male === false ? "a real woman" : "a real person",
+      lore: d.persona?.lore || (d.facts || []).join("; ").slice(0, 700)
+    };
+  }
+  getPortal(slug, userId) {
+    const r = this.portalRow(slug);
+    if (!r) return null;
+    if (r.status !== "published" && r.owner !== userId) return null;
+    const d = JSON.parse(r.data);
+    delete d.facts; // the raw facts stay private; the generated content is public
+    return { slug: r.slug, name: r.name, status: r.status, config: d, face: r.face || null };
+  }
+  listPortals(all = false) {
+    const rows = this.sql.exec(`SELECT slug, name, status, data, published_at FROM portals ${all ? "" : "WHERE status = 'published'"} ORDER BY COALESCE(published_at, created_at) DESC LIMIT 200`).toArray();
+    return rows.map((r) => {
+      const d = JSON.parse(r.data);
+      return { slug: r.slug, name: r.name, status: r.status, title: d.site ? `${d.site.title1} ${d.site.title2}` : r.name, tagline: d.site?.tagline || "", accent: d.colors?.accent || null, publishedAt: r.published_at };
+    });
+  }
+  draftOf(userId) {
+    const r = this.sql.exec("SELECT * FROM portals WHERE owner = ? ORDER BY created_at DESC LIMIT 1", userId).toArray()[0];
+    return r ? { slug: r.slug, name: r.name, status: r.status, data: JSON.parse(r.data), face: r.face || null } : null;
+  }
+  createDraft(userId, slug, name) {
+    if (!name) return { error: "Как зовут героя портала?" };
+    const u = this.sql.exec("SELECT admin, portal_quota FROM users WHERE id = ?", userId).one();
+    const mine = this.sql.exec("SELECT COUNT(*) AS n FROM portals WHERE owner = ?", userId).one().n;
+    if (!u.admin && mine >= u.portal_quota) return { error: "Ты уже создал своего персонажа. Новые порталы скоро будут платными." };
+    if (this.portalRow(slug)) return { error: "Такой адрес уже занят" };
+    const now = Date.now();
+    this.sql.exec("INSERT INTO portals (slug, owner, name, status, data, created_at, updated_at) VALUES (?, ?, ?, 'draft', ?, ?, ?)", slug, userId, name, JSON.stringify({ facts: [] }), now, now);
+    return { draft: this.draftOf(userId) };
+  }
+  // Manual edits and AI results are merged into the draft. Only known top-level keys, size-capped.
+  patchDraft(userId, patch) {
+    const r = this.sql.exec("SELECT * FROM portals WHERE owner = ? ORDER BY created_at DESC LIMIT 1", userId).toArray()[0];
+    if (!r) return { error: "Нет черновика" };
+    const KEYS = ["facts", "look", "summary", "persona", "lines", "achievements", "questions", "site", "colors", "font", "pattern", "games", "branches", "talents", "sharp"];
+    const data = JSON.parse(r.data);
+    for (const k of KEYS) if (patch[k] !== undefined) data[k] = patch[k];
+    if (Array.isArray(data.facts)) data.facts = data.facts.map((f) => String(f).replace(/\s+/g, " ").trim().slice(0, 300)).filter(Boolean).slice(0, 40);
+    const text = JSON.stringify(data);
+    if (text.length > 250_000) return { error: "Слишком много данных" };
+    let face = r.face;
+    if (typeof patch.face === "string" && /^data:image\/(jpeg|png|webp);base64,/.test(patch.face) && patch.face.length < 120_000) face = patch.face;
+    this.sql.exec("UPDATE portals SET data = ?, face = ?, updated_at = ? WHERE slug = ?", text, face, Date.now(), r.slug);
+    return { ok: true, draft: this.draftOf(userId) };
+  }
+  publish(userId) {
+    const d = this.draftOf(userId);
+    if (!d) return { error: "Нет черновика" };
+    const need = ["persona", "lines", "questions", "site", "talents"];
+    const missing = need.filter((k) => !d.data[k]);
+    if (missing.length) return { error: "Не все шаги готовы", missing };
+    this.sql.exec("UPDATE portals SET status = 'published', published_at = COALESCE(published_at, ?), updated_at = ? WHERE slug = ?", Date.now(), Date.now(), d.slug);
+    return { ok: true, slug: d.slug };
+  }
+  deleteDraft(userId) {
+    const d = this.draftOf(userId);
+    if (d) this.sql.exec("DELETE FROM portals WHERE slug = ?", d.slug);
+    return { ok: true };
+  }
+  adminDelete(slug) {
+    this.sql.exec("DELETE FROM portals WHERE slug = ?", slug);
+    return { ok: true };
   }
 
   // Simple rate limit: at most `limit` events per `windowSec` seconds
