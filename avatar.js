@@ -1,4 +1,4 @@
-import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610260531";
+import { TALENTS, TALENT_LINES, progressFrom } from "./talents.js?v=202610272025";
 
 // Phil the mascot: a 3D cartoon Phil who walks along the bottom of the screen (phil3d.js), with a flat
 // anime-style SVG badge as the fallback. He reacts to game events with a speech bubble and now and
@@ -308,7 +308,7 @@ export function initAvatar({ onLine, onContext, look = null, smokes = true, fall
   let smoking = false, smokeTimers = [];
 
   // Prefer the 3D Phil; if WebGL or the library is unavailable, show the flat SVG badge instead
-  import("./phil3d.js?v=202610260531")
+  import("./phil3d.js?v=202610272025")
     .then(({ createPhil3D }) => {
       body3d = createPhil3D(root, {
         bubble,

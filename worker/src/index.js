@@ -228,6 +228,15 @@ export default {
         if (path === "/admin/facts" && request.method === "GET") {
           return json({ facts: await store.listFacts() });
         }
+        // Feed moderation for this portal
+        if (path === "/admin/events" && request.method === "GET") {
+          return json({ events: await store.listEvents(200, Number(url.searchParams.get("before")) || 0, 0) });
+        }
+        const ev = path.match(/^\/admin\/events\/(\d+)$/);
+        if (ev && request.method === "DELETE") {
+          await store.deleteEvent(Number(ev[1]));
+          return json({ ok: true });
+        }
         const m = path.match(/^\/admin\/questions\/(\d+)$/);
         if (m && request.method === "DELETE") {
           await store.deleteQuestion(Number(m[1]));
@@ -302,7 +311,6 @@ async function platformRoutes(request, env, url, path, ip, platform) {
     const r = await platform.createInvite(user.id);
     return r.error ? json(r, 400) : json(r);
   }
-  if (path === "/portals" && request.method === "GET") return json({ portals: await platform.listPortals() });
   if (path === "/portal" && request.method === "GET") {
     const slug = clean(url.searchParams.get("slug"), 40).toLowerCase();
     const p = await platform.getPortal(slug, user?.id || null);
@@ -875,6 +883,10 @@ export class QuizStore extends DurableObject {
     for (const r of rows) { xp[r.branch] = r.xp; events[r.branch] = r.events; }
     const players = this.sql.exec("SELECT COUNT(DISTINCT name) AS n FROM events").one().n;
     return { xp, events, players };
+  }
+
+  deleteEvent(id) {
+    this.sql.exec("DELETE FROM events WHERE id = ?", id);
   }
 
   listEvents(limit, before, after) {

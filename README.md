@@ -8,10 +8,10 @@ A Russian-language party quiz about our friend Phil (aka **x23x**). Each game pi
 
 ## Platform: portals for anyone (invite-only)
 
-Phil's site is the first portal of a small platform. Any member can build a portal like this about themselves or a friend; Root AI fills it in from photos and facts.
+Phil's site is the first portal of a small platform. Any member can build a portal like this about themselves or a friend; Root AI fills it in from photos and facts. Portals are separate projects: each has its own link (`?p=<slug>`), players, leaderboard, feed, achievements, progression and player name, and no portal links to another. The builder and the account page live on their own page, `create.html`, so building a portal never touches Phil's site.
 
-- **Access.** Invite-only. An invite code creates an account with a secret key stored in the browser (shown in «Мой аккаунт» to copy to other devices). Every member gets 5 one-time invites and one portal; the admin has no limits. The admin account is created from `admin.html` → «Платформа» with the `ADMIN_TOKEN`.
-- **Builder** (`#/create`, `create.js`): 0) hero name, address (`?p=<slug>`) and consent (the person agrees and is 18+); 1) 1–5 photos, downscaled in the browser; Root AI returns the avatar look and a face box, the page crops the face (photos themselves are not stored); 2) at least 5 facts; 3) Root AI writes the persona (name in all Russian cases), lines for every mascot event, themed achievements and a 30-question quiz; 4) theme (title, colors, heading font, background pattern, jersey) and re-skinned mini-games (clicker, economy round, relax game); 5) 10 animations picked from the library with names, talent branches and sharp line packs. Every step can be regenerated or edited by hand; the owner previews the portal privately and publishes it.
+- **Access.** Invite-only. An invite code creates an account with a secret key stored in the browser (shown in «Мой аккаунт» on `create.html` to copy to other devices). Every member gets 5 one-time invites and one portal; the admin has no limits. The admin account is created from `admin.html` → «Платформа» with the `ADMIN_TOKEN`.
+- **Builder** (`create.html`, `create.js`): 0) hero name, address (`?p=<slug>`) and consent (the person agrees and is 18+); 1) 1–5 photos, downscaled in the browser; Root AI returns the avatar look and a face box, the page crops the face (photos themselves are not stored); 2) at least 5 facts; 3) Root AI writes the persona (name in all Russian cases), lines for every mascot event, themed achievements and a 30-question quiz; 4) theme (title, colors, heading font, background pattern, jersey) and re-skinned mini-games (clicker, economy round, relax game); 5) 10 animations picked from the library with names, talent branches and sharp line packs. Every step can be regenerated or edited by hand; the owner previews the portal privately and publishes it.
 - **Runtime** (`portal.js`): `?p=<slug>` loads the portal's config before the app starts; questions, achievements, mascot lines, talents, game names, feed texts and the theme come from the config, and every API call carries `?portal=<slug>`. Phil (no `?p`) keeps his original content, easter eggs and the RMT exchange.
 - **Avatar** (`phil3d.js`): parametric — hair style (bald, buzz, short, medium, long, curly, ponytail) and color, skin, eyes, beard, mustache, glasses, build, top type and color (jersey shows the portal number), pants and shoes.
 - **Server**: each portal has its own Durable Object (Phil keeps the original one); accounts, invites and portal configs live in a `platform` object. The raw facts stay private. Builder AI calls are limited per member per day and globally (`BUILDER_PER_DAY`, default 600). Content rules in every prompt forbid insults about appearance, ethnicity, religion, health, sexuality and family, sexual content and personal data; photos of minors or without a clear person are rejected.
@@ -21,7 +21,6 @@ Phil's site is the first portal of a small platform. Any member can build a port
 | `POST` | `/auth/redeem` | Join with `{ code, name }` → `{ key, user }` |
 | `GET` | `/me` | Account, invites, own portals (Bearer key) |
 | `POST` | `/invites` | Create an invite code |
-| `GET` | `/portals` | Published portals |
 | `GET` | `/portal?slug=` | Portal config (drafts only for the owner) |
 | `GET/POST/PATCH/DELETE` | `/builder/draft` | Owner's draft: read, create `{ slug, name, consent }`, edit, delete |
 | `POST` | `/builder/photos` | `{ images: [base64 JPEG] }` → look, face box |
@@ -29,6 +28,8 @@ Phil's site is the first portal of a small platform. Any member can build a port
 | `POST` | `/builder/publish` | Publish the draft |
 | `POST` | `/admin/platform/account` | Create an admin account (ADMIN_TOKEN) |
 | `GET/DELETE` | `/admin/platform/portals[/slug]` | List or delete portals (ADMIN_TOKEN) |
+| `GET` | `/admin/events?portal=` | Last 200 feed events of a portal (ADMIN_TOKEN) |
+| `DELETE` | `/admin/events/:id?portal=` | Remove one feed event (ADMIN_TOKEN) |
 
 Root AI for the builder is called "Root AI - model b1t portal v1.0".
 

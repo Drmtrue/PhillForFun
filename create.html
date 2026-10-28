@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Создать портал</title>
+  <meta name="description" content="Сделай сайт-квиз с 3D-аватаром про себя или друга. Только по приглашению.">
+  <meta name="theme-color" content="#0b0a0a">
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=202610272025">
+  <style>
+    /* The builder is its own site: none of a portal's mascot, hoop, bubbles or feed */
+    body.builder { --red: #7c5cff; --red-2: #9b83ff; --red-dark: #3f2c9e; --led: #ffcf4a;
+      background: radial-gradient(ellipse 80% 50% at 50% -5%, rgba(124, 92, 255, .28) 0%, transparent 60%), #0b0a0f; }
+    .bld-nav { display: flex; gap: 6px; margin: -20px -8px 22px; padding: 8px; border: 1px solid var(--line); border-radius: 0 0 var(--radius) var(--radius); background: rgba(11, 10, 15, .85); position: sticky; top: 0; z-index: 6; }
+    .bld-nav a { flex: 1; text-align: center; padding: 8px 10px; border-radius: 10px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 14px; }
+    .bld-nav a.active { color: #fff; background: var(--red); box-shadow: 0 3px 0 var(--red-dark); }
+  </style>
+</head>
+<body class="builder">
+  <main class="wrap">
+    <nav class="bld-nav" aria-label="Разделы">
+      <a href="#create" data-tab="create">✨ Создать портал</a>
+      <a href="#me" data-tab="me">👤 Мой аккаунт</a>
+    </nav>
+    <section data-tab="create">
+      <div class="page-head">
+        <p class="kicker"><span class="dot"></span> root ai • порталы</p>
+        <h1 class="page-title">Свой портал</h1>
+        <p class="lead">Сделай отдельный сайт про себя или друга: квиз, мини-игры, 3D-аватар с анимациями и шутками. Root AI соберёт всё по фото и фактам. У каждого портала своя ссылка, свои игроки и своя история.</p>
+      </div>
+      <div id="create-root"><p class="muted">Загружаю…</p></div>
+    </section>
+    <section data-tab="me" hidden>
+      <div class="page-head">
+        <p class="kicker"><span class="dot"></span> аккаунт</p>
+        <h1 class="page-title">Мой аккаунт</h1>
+      </div>
+      <div id="me-root"><p class="muted">Загружаю…</p></div>
+    </section>
+  </main>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script type="module">
+    import { initCreate } from "./create.js?v=202610272025";
+    const $ = (id) => document.getElementById(id);
+
+    function toast(title, text) {
+      const box = $("toasts");
+      while (box.children.length >= 3) box.firstChild.remove();
+      const t = document.createElement("div");
+      t.className = "toast";
+      const b = document.createElement("b");
+      b.textContent = title;
+      t.append(b);
+      if (text) { const s = document.createElement("span"); s.textContent = text; t.append(s); }
+      box.append(t);
+      setTimeout(() => t.remove(), 4200);
+    }
+
+    const ui = initCreate({ meRoot: $("me-root"), createRoot: $("create-root"), toast });
+    function route() {
+      const tab = location.hash === "#me" ? "me" : "create";
+      document.querySelectorAll("section[data-tab]").forEach((s) => { s.hidden = s.dataset.tab !== tab; });
+      document.querySelectorAll(".bld-nav a").forEach((a) => a.classList.toggle("active", a.dataset.tab === tab));
+      tab === "me" ? ui.showMe() : ui.showCreate();
+    }
+    addEventListener("hashchange", route);
+    route();
+  </script>
+</body>
+</html>

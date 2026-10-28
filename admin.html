@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>Админка квиза</title>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610260531">
+  <link rel="stylesheet" href="style.css?v=202610272025">
   <style>
     .item { border-top: 1px solid var(--line); padding: 14px 0; }
     .item:first-child { border-top: 0; }
@@ -60,6 +60,7 @@
       <div class="tabs">
         <button class="btn on" data-tab="questions">Вопросы</button>
         <button class="btn" data-tab="facts">Все факты</button>
+        <button class="btn" data-tab="events">Лента</button>
         <button class="btn" data-tab="platform">Платформа</button>
         <select id="portal-pick" title="Чей квиз модерировать"><option value="phil">Портал: Фил</option></select>
         <button class="btn" id="logout">Выйти</button>
@@ -70,7 +71,7 @@
   </main>
 
   <script type="module">
-    import { API_URL } from "./config.js?v=202610260531";
+    import { API_URL } from "./config.js?v=202610272025";
     const API = API_URL.replace(/\/+$/, "");
     const $ = (id) => document.getElementById(id);
     let token = "";
@@ -80,7 +81,7 @@
     const ACCOUNT_KEY = "phill_account_key";
 
     async function api(path, opts = {}) {
-      const scoped = portal !== "phil" && /^\/admin\/(questions|facts)/.test(path);
+      const scoped = portal !== "phil" && /^\/admin\/(questions|facts|events)/.test(path);
       const res = await fetch(API + path + (scoped ? (path.includes("?") ? "&" : "?") + "portal=" + portal : ""), { ...opts, headers: { Authorization: "Bearer " + token, ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Ошибка");
@@ -182,6 +183,37 @@
       try {
         if (tab === "platform") {
           await renderPlatform(list);
+        } else if (tab === "events") {
+          const { events } = await api("/admin/events");
+          if (!events.length) list.append(el("p", "muted", "В ленте этого портала пусто."));
+          const names = [...new Set(events.map((e) => e.name))];
+          // Bulk: remove everything one player did (e.g. activity that landed on the wrong portal)
+          if (names.length) {
+            const bulk = el("div", "item");
+            const sel = el("select");
+            sel.id = "ev-name";
+            sel.innerHTML = names.map((n) => `<option>${n.replace(/[<>&"]/g, "")}</option>`).join("");
+            const go = el("button", "btn", "Удалить все записи игрока");
+            go.onclick = async () => {
+              const n = sel.value;
+              const ids = events.filter((e) => e.name === n).map((e) => e.id);
+              if (!confirm(`Удалить ${ids.length} записей игрока «${n}» из ленты этого портала?`)) return;
+              for (const id of ids) await api(`/admin/events/${id}`, { method: "DELETE" });
+              render();
+            };
+            bulk.append(el("p", "q", "Записи одного игрока"), sel, go);
+            list.append(bulk);
+          }
+          for (const e of events) {
+            const item = el("div", "item");
+            item.append(el("p", "q", `${e.name} · ${e.type}`));
+            item.append(el("p", "meta", `${when(e.ts)} · ${JSON.stringify(e.data).slice(0, 160)}`));
+            const del = el("button", "btn", "Удалить");
+            del.onclick = async () => { await api(`/admin/events/${e.id}`, { method: "DELETE" }); item.remove(); };
+            item.append(del);
+            list.append(item);
+          }
+          $("status").textContent = `Записей в ленте (последние 200): ${events.length}`;
         } else if (tab === "questions") {
           const { questions } = await api("/admin/questions");
           if (!questions.length) list.append(el("p", "muted", "Пока нет вопросов от игроков."));

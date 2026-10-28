@@ -1,19 +1,18 @@
-import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610260531";
-import { renderRmt } from "./rmt-page.js?v=202610260531";
-import { initHoop } from "./hoop.js?v=202610260531";
-import { freeThrow } from "./freethrow.js?v=202610260531";
-import { onSkinChange } from "./ballskin.js?v=202610260531";
-import { mountSmoke } from "./game-smoke.js?v=202610260531";
-import { mountFarm } from "./game-farm.js?v=202610260531";
-import { mountBath } from "./game-bath.js?v=202610260531";
-import { renderTree } from "./tree.js?v=202610260531";
-import { TALENTS, usePortalTalents } from "./talents.js?v=202610260531";
-import { SLUG, IS_PHIL, PORTAL, loadPortal, applyPortalPage, withPortal, hero } from "./portal.js?v=202610260531";
-import { initDebug } from "./debug.js?v=202610260531";
-import { initCreate } from "./create.js?v=202610260531";
-import { initFeed } from "./feed.js?v=202610260531";
-import { initAvatar, overrideLines } from "./avatar.js?v=202610260531";
-import { setFaceSrc } from "./ballskin.js?v=202610260531";
+import { QUIZ, API_URL, RMT_GOAL } from "./config.js?v=202610272025";
+import { renderRmt } from "./rmt-page.js?v=202610272025";
+import { initHoop } from "./hoop.js?v=202610272025";
+import { freeThrow } from "./freethrow.js?v=202610272025";
+import { onSkinChange } from "./ballskin.js?v=202610272025";
+import { mountSmoke } from "./game-smoke.js?v=202610272025";
+import { mountFarm } from "./game-farm.js?v=202610272025";
+import { mountBath } from "./game-bath.js?v=202610272025";
+import { renderTree } from "./tree.js?v=202610272025";
+import { TALENTS, usePortalTalents } from "./talents.js?v=202610272025";
+import { SLUG, IS_PHIL, PORTAL, loadPortal, applyPortalPage, withPortal, hero } from "./portal.js?v=202610272025";
+import { initDebug } from "./debug.js?v=202610272025";
+import { initFeed } from "./feed.js?v=202610272025";
+import { initAvatar, overrideLines } from "./avatar.js?v=202610272025";
+import { setFaceSrc } from "./ballskin.js?v=202610272025";
 
 // ----- Which portal: Phil (default) or one made with the builder (?p=slug). Its content replaces Phil's.
 await loadPortal();
@@ -42,7 +41,8 @@ const phil = initAvatar({
 }); // the hero mascot
 
 const $ = (id) => document.getElementById(id);
-const NAME_COOKIE = "phill_quiz_name";
+// The player name is kept per portal (Phil keeps the original cookie name)
+const NAME_COOKIE = IS_PHIL ? "phill_quiz_name" : `portal_name_${SLUG}`;
 const LOCAL_KEY = "phill_quiz_scores";
 const ACH_KEY = "phill_quiz_ach";
 const LAST_SCORE_KEY = "phill_quiz_last";
@@ -1160,8 +1160,8 @@ mountBath($("g-bath"), gameCtx("bath"));
 const GAMES = ["smoke", "farm", "bath"];
 
 /* ---------- Sections (hash routes) ---------- */
-const PAGES = IS_PHIL ? ["home", "quiz", "rmt", "games", "phil", "ach", "create", "me"] : ["home", "quiz", "games", "phil", "ach"];
-const creator = IS_PHIL ? initCreate({ meRoot: $("me-root"), createRoot: $("create-root"), toast }) : null;
+const PAGES = IS_PHIL ? ["home", "quiz", "rmt", "games", "phil", "ach"] : ["home", "quiz", "games", "phil", "ach"];
+
 function route() {
   const [, name, sub] = location.hash.match(/^#\/?([\w-]+)?\/?([\w-]+)?/) || [];
   const page = PAGES.includes(name) ? name : "home";
@@ -1180,8 +1180,6 @@ function route() {
   document.body.dataset.page = page;
   updatePlaying();
   if (page === "quiz" && $("screen-start").classList.contains("active")) renderBoard($("board-start"));
-  if (page === "create") creator?.showCreate();
-  if (page === "me") creator?.showMe();
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
@@ -1291,24 +1289,8 @@ const debugCombo = (() => {
 })();
 if (new URLSearchParams(location.search).has("debug")) window.__debug = debug;
 
-/* ---------- Portals made by members (main site home) ---------- */
-async function loadPortals() {
-  if (!IS_PHIL || !API) return;
-  try {
-    const { portals } = await api("/portals");
-    if (!portals.length) return;
-    $("portal-grid").innerHTML = portals.slice(0, 12).map((p) => `
-      <a class="portal-card" href="./?p=${encodeURIComponent(p.slug)}" style="--pc:${/^#[0-9a-f]{6}$/i.test(p.accent || "") ? p.accent : "var(--red)"}">
-        <b>${escapeHtml(p.title)}</b><span>${escapeHtml(p.tagline || p.name)}</span>
-      </a>`).join("");
-    $("portals").hidden = false;
-  } catch (_) { /* the directory is optional */ }
-}
-function escapeHtml(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
-
 /* ---------- Startup ---------- */
 loadProgress();
-loadPortals();
 $("player-name").value = getName();
 $("fact-block").hidden = !API;
 updateFoot();

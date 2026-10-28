@@ -1,4 +1,4 @@
-import { spinDetector, drawFace } from "./ballskin.js?v=202610260531";
+import { spinDetector, drawFace } from "./ballskin.js?v=202610272025";
 
 // Side-court mini-game: a hoop appears in the empty space left or right of the quiz column,
 // the ball lies at the bottom of the viewport, and the player drags and flings it into the hoop.

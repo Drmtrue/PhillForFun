@@ -9,7 +9,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Graduate&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=202610260531">
+  <script>
+    // The portal builder and the account page moved to create.html; old #/create and #/me links follow
+    function toBuilder() { if (/^#\/(create|me)\b/.test(location.hash)) location.replace("create.html" + (location.hash.indexOf("#/me") === 0 ? "#me" : "")); }
+    toBuilder();
+    addEventListener("hashchange", toBuilder);
+  </script>
+  <link rel="stylesheet" href="style.css?v=202610272025">
 </head>
 <body>
   <!-- Background: court lines and bath bubbles -->
@@ -43,7 +49,6 @@
       <a href="#/games" data-page="games"><span aria-hidden="true">🎮</span><b>Мини-игры</b></a>
       <a href="#/phil" data-page="phil"><span aria-hidden="true">🌳</span><b>Таланты</b></a>
       <a href="#/ach" data-page="ach"><span aria-hidden="true">🏆</span><b>Ачивки</b></a>
-      <a href="./#/create" data-page="create" class="nav-create"><span aria-hidden="true">✨</span><b>Создать</b></a>
     </nav>
 
     <!-- Home -->
@@ -68,12 +73,6 @@
           </svg>
         </div>
       </div>
-
-      <!-- Portals made by members (main site only) -->
-      <section class="portals" id="portals" hidden>
-        <div class="feed-head"><h2>Порталы друзей</h2><a class="tag" href="#/create">✨ создать свой</a></div>
-        <div class="portal-grid" id="portal-grid"></div>
-      </section>
 
       <!-- Event feed: what everyone did on the site -->
       <section class="feed" id="feed"></section>
@@ -266,24 +265,6 @@
       <div id="phil-tree" class="tree"><p class="muted">Загружаю…</p></div>
     </section>
 
-    <!-- Portal builder and account (main site) -->
-    <section class="page" data-page="create" hidden>
-      <div class="page-head">
-        <p class="kicker"><span class="dot"></span> платформа • root ai</p>
-        <h1 class="page-title">Свой портал</h1>
-        <p class="lead">Сделай такой же сайт про себя или друга: квиз, мини-игры, 3D-аватар с анимациями и шутками. Root AI соберёт всё по фото и фактам. <a href="#/me">Мой аккаунт</a></p>
-      </div>
-      <div id="create-root"><p class="muted">Загружаю…</p></div>
-    </section>
-    <section class="page" data-page="me" hidden>
-      <div class="page-head">
-        <p class="kicker"><span class="dot"></span> аккаунт</p>
-        <h1 class="page-title">Мой аккаунт</h1>
-        <p class="lead"><a href="#/create">← К созданию портала</a></p>
-      </div>
-      <div id="me-root"><p class="muted">Загружаю…</p></div>
-    </section>
-
     <!-- Achievements (shared by every section) -->
     <section class="page" data-page="ach" hidden>
       <div class="page-head">
@@ -308,8 +289,8 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="hoop-hud" id="hoop-hud" title="Попадания в боковое кольцо. Считаются отдельно от ответов.">🏀 <b id="hoop-count">0</b> <span>в кольцо</span></div>
 
-  <script src="questions.js?v=202610260531"></script>
-  <script src="achievements.js?v=202610260531"></script>
-  <script type="module" src="app.js?v=202610260531"></script>
+  <script src="questions.js?v=202610272025"></script>
+  <script src="achievements.js?v=202610272025"></script>
+  <script type="module" src="app.js?v=202610272025"></script>
 </body>
 </html>

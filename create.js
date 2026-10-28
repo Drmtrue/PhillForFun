@@ -2,8 +2,8 @@
 // Joining is invite-only: an invite code creates an account with a secret key kept in this browser.
 // The builder walks through photos, facts, Root AI content, theme and animations, then preview and publish.
 
-import { API_URL } from "./config.js?v=202610260531";
-import { ACCOUNT_KEY, escapeHtml as esc } from "./portal.js?v=202610260531";
+import { API_URL } from "./config.js?v=202610272025";
+import { ACCOUNT_KEY, escapeHtml as esc } from "./portal.js?v=202610272025";
 
 const API = API_URL.replace(/\/+$/, "");
 const getKey = () => { try { return localStorage.getItem(ACCOUNT_KEY) || ""; } catch (_) { return ""; } };
@@ -112,7 +112,7 @@ export function initCreate({ meRoot, createRoot, toast }) {
       </div>
       <div class="panel">
         <div class="panel-head"><h2>Мои порталы</h2><span class="tag">${me.user.admin ? "без лимита" : "1 бесплатный"}</span></div>
-        ${me.portals.length ? `<ul class="cr-list">${me.portals.map((p) => `<li><b>${esc(p.name)}</b> · ${p.status === "published" ? "опубликован" : "черновик"} · <a href="./?p=${p.slug}">открыть</a></li>`).join("")}</ul>` : '<p class="muted small">Пока нет. <a href="#/create">Создать портал</a></p>'}
+        ${me.portals.length ? `<ul class="cr-list">${me.portals.map((p) => `<li><b>${esc(p.name)}</b> · ${p.status === "published" ? "опубликован" : "черновик"} · <a href="./?p=${p.slug}">открыть</a></li>`).join("")}</ul>` : '<p class="muted small">Пока нет. <a href="#create">Создать портал</a></p>'}
       </div>
       <div class="panel">
         <div class="panel-head"><h2>Приглашения</h2><span class="tag">${me.invitesLeft == null ? "без лимита" : `осталось ${me.invitesLeft}`}</span></div>
@@ -147,7 +147,7 @@ export function initCreate({ meRoot, createRoot, toast }) {
             <button class="btn primary">Начать</button>
           </form>
           <p class="cr-msg"></p>
-        </div>` : `<div class="panel"><p>Ты уже создал своего персонажа. Новые порталы скоро станут платными.</p><a class="btn" href="#/me">Мой аккаунт</a></div>`;
+        </div>` : `<div class="panel"><p>Ты уже создал своего персонажа. Новые порталы скоро станут платными.</p><a class="btn" href="#me">Мой аккаунт</a></div>`;
       const nameIn = createRoot.querySelector('[name="name"]'), slugIn = createRoot.querySelector('[name="slug"]');
       nameIn?.addEventListener("input", () => { if (!slugIn.dataset.touched) slugIn.value = slugify(nameIn.value); });
       slugIn?.addEventListener("input", () => { slugIn.dataset.touched = "1"; });
@@ -288,7 +288,7 @@ export function initCreate({ meRoot, createRoot, toast }) {
           <a class="btn" href="./?p=${draft.slug}" target="_blank" rel="noopener">Открыть превью ↗</a>
           <button class="btn primary" data-act="publish" ${["content", "theme", "anims"].every((k) => ok[k]) ? "" : "disabled"}>${draft.status === "published" ? "Обновить опубликованный" : "Опубликовать"}</button>
         </div>
-        ${draft.status === "published" ? `<p>Ссылка для друзей: <code class="cr-link">${location.origin}${location.pathname}?p=${draft.slug}</code> <button class="link-egg" data-copy="${location.origin}${location.pathname}?p=${draft.slug}">скопировать</button></p>` : ""}
+        ${draft.status === "published" ? `<p>Ссылка для друзей: <code class="cr-link">${location.origin}${location.pathname.replace(/[^/]*$/, "")}?p=${draft.slug}</code> <button class="link-egg" data-copy="${location.origin}${location.pathname.replace(/[^/]*$/, "")}?p=${draft.slug}">скопировать</button></p>` : ""}
         <details class="cr-danger"><summary>Удалить портал</summary><p class="muted small">Удаляется навсегда вместе со всеми данными.</p><button class="btn" data-act="delete">Удалить</button></details>
       </div>`;
   }

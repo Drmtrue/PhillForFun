@@ -2,7 +2,7 @@
 // loadPortal() fetches the published config (or the owner's draft for a preview) before the app starts.
 // Phil's own content stays in the code; other portals override it from their config.
 
-import { API_URL } from "./config.js?v=202610260531";
+import { API_URL } from "./config.js?v=202610272025";
 
 const params = new URLSearchParams(location.search);
 export const SLUG = (params.get("p") || "phil").toLowerCase().replace(/[^a-z0-9-]/g, "") || "phil";
@@ -56,7 +56,7 @@ export function applyPortalPage() {
   const set = (sel, text) => { const el = $(sel); if (el) el.textContent = text; };
   if (PORTAL.error) {
     document.body.classList.add("portal-missing");
-    $(".wrap").innerHTML = `<div class="portal-404"><h1 class="page-title">Портал не найден</h1><p class="lead">${PORTAL.error}. Проверь ссылку.</p><a class="btn primary" href="./">На главную</a></div>`;
+    $(".wrap").innerHTML = `<div class="portal-404"><h1 class="page-title">Портал не найден</h1><p class="lead">${PORTAL.error}. Проверь ссылку.</p></div>`;
     return;
   }
   const c = PORTAL.config, site = c.site || {}, col = c.colors || {};
@@ -118,7 +118,7 @@ export function applyPortalPage() {
   if (PORTAL.status !== "published") {
     const b = document.createElement("div");
     b.className = "preview-banner";
-    b.innerHTML = `Превью портала — видишь только ты. <a href="./#/create">Вернуться в билдер</a>`;
+    b.innerHTML = `Превью портала — видишь только ты. <a href="create.html">Вернуться в билдер</a>`;
     document.body.prepend(b);
   }
   void dat;

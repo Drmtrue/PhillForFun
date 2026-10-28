@@ -3,7 +3,7 @@
 // (no events, no XP, no achievements) and the mascot's talents are shown as fully unlocked.
 // initDebug({ phil, hoop, sfx, toast, onEnter, onExit }) → { enter(), exit(), get on() }
 
-import { TALENTS, BRANCHES, TALENT_LINES, MAX_LEVEL, xpForLevel } from "./talents.js?v=202610260531";
+import { TALENTS, BRANCHES, TALENT_LINES, MAX_LEVEL, xpForLevel } from "./talents.js?v=202610272025";
 
 const REACTIONS = ["happy", "sad", "shock", "smug", "wave", "angry"];
 const SCENE_TITLES = Object.fromEntries(TALENTS.filter((t) => t.anim).map((t) => [t.anim, `${t.icon} ${t.title}`]));
